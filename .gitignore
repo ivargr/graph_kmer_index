@@ -1,0 +1,6 @@
+.cache
+.idea
+graph_kmer_index.egg-info/
+graph_kmer_index/__pycache__/
+graph_minimap.egg-info/
+
