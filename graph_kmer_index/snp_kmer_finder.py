@@ -2,9 +2,17 @@ import logging
 logging.basicConfig(level=logging.INFO)
 import numpy as np
 from offsetbasedgraph import Graph, Interval, Block, SequenceGraph
-from graph_minimap.find_minimizers_in_kmers import kmer_to_hash_fast
 from .flat_kmers import FlatKmers, letter_sequence_to_numeric
+from numba import jit
 
+
+def sequence_to_kmer_hash(sequence):
+    return kmer_to_hash_fast(letter_sequence_to_numeric(sequence), len(sequence))
+
+@jit(nopython=True)
+def kmer_to_hash_fast(kmer, k):
+    numbers = int(np.sum(kmer * np.power(4, np.arange(0, k)[::-1])))
+    return numbers
 
 
 class SnpKmerFinder:
@@ -20,10 +28,12 @@ class SnpKmerFinder:
         self.linear_nodes = linear_ref.nodes_in_interval()
         self._hashes = []
         self._nodes = []
+        self._ref_offsets = []
         self.kmers_found = []
         self._bases_in_search_path = []
         self._nodes_in_path = []
         self._kmers_found = 0
+        self._current_ref_offset = None
 
 
     def has_kmer(self, kmer, nodes):
@@ -43,8 +53,10 @@ class SnpKmerFinder:
         for node in nodes:
             self._hashes.append(hash)
             self._nodes.append(node)
+            self._ref_offsets.append(self._current_ref_offset)
 
     def _find_all_variant_kmers_from_position(self, linear_ref_pos):
+        self._current_ref_offset = linear_ref_pos
 
         # Always start one base pair before, but do not include that base pair
         # this lets us catch cases where we are at a beginning of a node
@@ -110,7 +122,7 @@ class SnpKmerFinder:
             self._find_kmers_from_linear_ref_position(pos)
 
         logging.info("Done finding all kmers")
-        return FlatKmers(np.array(self._hashes, dtype=np.uint64), np.array(self._nodes, np.uint32))
+        return FlatKmers(np.array(self._hashes, dtype=np.uint64), np.array(self._nodes, np.uint32), np.array(self._ref_offsets, np.uint32))
 
 
 

@@ -1,15 +1,7 @@
 import numpy as np
+import logging
 
-class LogNHashMap:
-    def __init__(self, sorted_hash_array):
-        self._hashes = np.unique(sorted_hash_array)
-
-    def hash(self, key):
-        index = np.searchsorted(self._hashes, key)
-        if self._hashes[index] != key:
-            return None
-        return index
-
+class BaseHashMap:
     def to_file(self, file_name):
         np.save(file_name, self._hashes)
 
@@ -22,5 +14,39 @@ class LogNHashMap:
 
     def unhash(self, hash):
         return self._hashes[hash]
+
+
+class ModuloHashMap(BaseHashMap):
+    def __init__(self, hashes):
+        self._hashes = hashes
+
+    @classmethod
+    def from_sorted_array(cls, sorted_hash_array, modulo=452930477):
+        logging.info("Creating modulohashmap with modulo %s" % modulo)
+        sorted_hash_array = np.unique(sorted_hash_array)
+        hashes = np.zeros(modulo)
+        modulo = sorted_hash_array % modulo
+        hashes[modulo] = np.array(np.arange(0, len(sorted_hash_array)), dtype=np.uint32)
+        logging.info("Done creating hashmap")
+        return cls(hashes)
+
+    def hash(self, key, modulo=452930477):
+        #return int(self._hashes[key])
+        index = self._hashes[key % modulo]
+        if index == 0:
+            return None
+
+        return int(index)
+
+
+class LogNHashMap(BaseHashMap):
+    def __init__(self, sorted_hash_array):
+        self._hashes = np.unique(sorted_hash_array)
+
+    def hash(self, key):
+        index = np.searchsorted(self._hashes, key)
+        if index >= len(self._hashes) or self._hashes[index] != key:
+            return None
+        return index
 
 
