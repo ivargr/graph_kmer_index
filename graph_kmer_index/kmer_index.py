@@ -8,7 +8,7 @@ from .flat_kmers import FlatKmers
 class KmerIndex:
     def __init__(self, hasher, hashes_to_index, n_kmers, nodes, ref_offsets):
         self._hasher = hasher
-        self._hashes_to_index = hashes_to_index
+        self._hashes_to_index = np.array(hashes_to_index, dtype=np.int)
         self._n_kmers = n_kmers
         self._nodes = nodes
         self._ref_offsets = ref_offsets
@@ -31,13 +31,33 @@ class KmerIndex:
     def get_nodes_and_ref_offsets(self, kmer_hash):
         index_hash = self._hasher.hash(kmer_hash)
         if index_hash == 0:
-            return None
+            return None, None
         if index_hash is None:
-            return None
+            return None, None
 
         position = self._hashes_to_index[index_hash]
         n_hits = self._n_kmers[index_hash]
         return self._nodes[position:position+n_hits], self._ref_offsets[position:position+n_hits]
+
+    def get_nodes_and_ref_offsets_from_multiple_kmers(self, kmers):
+        all_nodes = []
+        all_ref_offsets = []
+        all_read_offsets = []
+        for i, hash in enumerate(kmers):
+            nodes, ref_offsets = self.get_nodes_and_ref_offsets(hash)
+            if nodes is None:
+                continue
+            all_nodes.append(nodes)
+            all_ref_offsets.append(ref_offsets)
+            all_read_offsets.append(np.zeros(len(nodes)) + i)
+
+        if len(all_nodes) == 0:
+            return np.array([]), np.array([]), np.array([])
+
+        all_nodes = np.concatenate(all_nodes)
+        all_ref_offsets = np.concatenate(all_ref_offsets)
+        all_read_offsets = np.concatenate(all_read_offsets)
+        return all_nodes, all_ref_offsets, all_read_offsets
 
     def to_file(self, file_name):
         logging.info("Writing kmer index to file: %s" % file_name)

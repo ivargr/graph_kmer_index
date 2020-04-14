@@ -13,5 +13,10 @@ def test_from_flat_kmers():
     assert 3 in reverse.get_node_kmers(3)
     assert 4 in reverse.get_node_kmers(8)
 
+    reverse.to_file("tmp.reverse")
+    new_reverse = ReverseKmerIndex.from_file("tmp.reverse.npz")
+
+    assert 3 in new_reverse.get_node_kmers(3)
+
 if __name__ == "__main__":
     test_from_flat_kmers()

@@ -9,6 +9,7 @@ from .snp_kmer_finder import SnpKmerFinder
 import pickle
 from .flat_kmers import FlatKmers
 from .kmer_index import KmerIndex
+from .reverse_kmer_index import ReverseKmerIndex
 
 def main():
     run_argument_parser(sys.argv[1:])
@@ -39,6 +40,12 @@ def merge_indexes(args):
     logging.info("Done")
 
 
+def make_reverse(args):
+    flat = FlatKmers.from_file(args.flat_index)
+    reverse = ReverseKmerIndex.from_flat_kmers(flat)
+    reverse.to_file(args.out_file_name)
+    logging.info("Done. Wrote reverse index to file: %s" % args.out_file_name)
+
 
 def run_argument_parser(args):
     parser = argparse.ArgumentParser(
@@ -58,6 +65,11 @@ def run_argument_parser(args):
     subparser.add_argument("-o", "--out_file_name", required=True)
     subparser.add_argument("files", nargs="+")
     subparser.set_defaults(func=merge_indexes)
+
+    subparser = subparsers.add_parser("make_reverse")
+    subparser.add_argument("-f", "--flat-index", required=True)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.set_defaults(func=make_reverse)
 
 
 

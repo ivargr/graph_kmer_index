@@ -4,10 +4,13 @@ from collections import defaultdict
 
 
 class FlatKmers:
-    def __init__(self, hashes, nodes, ref_offsets):
+    def __init__(self, hashes, nodes, ref_offsets=None):
         self._hashes = hashes
         self._nodes = nodes
-        self._ref_offsets = ref_offsets
+        if ref_offsets is None:
+            self._ref_offsets = np.zeros(len(self._nodes))
+        else:
+            self._ref_offsets = ref_offsets
 
     @classmethod
     def from_file(cls, file_name):

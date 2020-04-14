@@ -8,9 +8,9 @@ class BaseHashMap:
     @classmethod
     def from_file(cls, file_name):
         data = np.load(file_name + ".npy")
-        map = cls([])
-        map._hashes = data
-        return map
+        #map = cls([])
+        #map._hashes = data
+        return cls(data)
 
     def unhash(self, hash):
         return self._hashes[hash]
@@ -18,7 +18,7 @@ class BaseHashMap:
 
 class ModuloHashMap(BaseHashMap):
     def __init__(self, hashes):
-        self._hashes = hashes
+        self._hashes = hashes.astype(np.int) # np.array(hashes).astype(np.int)
 
     @classmethod
     def from_sorted_array(cls, sorted_hash_array, modulo=452930477):
