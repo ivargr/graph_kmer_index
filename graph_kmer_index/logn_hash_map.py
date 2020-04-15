@@ -8,6 +8,8 @@ class BaseHashMap:
     @classmethod
     def from_file(cls, file_name):
         data = np.load(file_name + ".npy")
+        if data.dtype != np.int:
+            data = data.astype(np.int)
         #map = cls([])
         #map._hashes = data
         return cls(data)
@@ -18,7 +20,11 @@ class BaseHashMap:
 
 class ModuloHashMap(BaseHashMap):
     def __init__(self, hashes):
-        self._hashes = hashes.astype(np.int) # np.array(hashes).astype(np.int)
+        if hashes.dtype != np.int:
+            logging.info("Converting hashes to int")
+            self._hashes = hashes.astype(np.int) # np.array(hashes).astype(np.int)
+        else:
+            self._hashes = hashes
 
     @classmethod
     def from_sorted_array(cls, sorted_hash_array, modulo=452930477):

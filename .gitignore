@@ -3,4 +3,16 @@
 graph_kmer_index.egg-info/
 graph_kmer_index/__pycache__/
 graph_minimap.egg-info/
+*.c
+*.html
+*.npz
+*.fa
+*.npy
+*.fai
+*.swp
+*.txt
+tests/*.critical_nodes
+tests/*.nobg*
+tests/*.interval
+__pycache__
 

@@ -8,7 +8,10 @@ from .flat_kmers import FlatKmers
 class KmerIndex:
     def __init__(self, hasher, hashes_to_index, n_kmers, nodes, ref_offsets):
         self._hasher = hasher
-        self._hashes_to_index = np.array(hashes_to_index, dtype=np.int)
+        if hashes_to_index.dtype != np.int:
+            self._hashes_to_index = np.array(hashes_to_index, dtype=np.int)
+        else:
+            self._hashes_to_index = hashes_to_index
         self._n_kmers = n_kmers
         self._nodes = nodes
         self._ref_offsets = ref_offsets
