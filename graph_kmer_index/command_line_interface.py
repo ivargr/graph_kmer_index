@@ -1,6 +1,9 @@
 import sys
 import argparse
 import logging
+
+from .collision_free_kmer_index import CollisionFreeKmerIndex
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 from offsetbasedgraph import Graph, SequenceGraph, NumpyIndexedInterval
 from vcfmap import VcfMap
@@ -39,6 +42,12 @@ def merge_indexes(args):
     index.to_file(args.out_file_name)
     logging.info("Done")
 
+def make_collision_free(args):
+    flat = FlatKmers.from_file(args.flat_index)
+    index = CollisionFreeKmerIndex.from_flat_kmers(flat)
+    index.to_file(args.out_file_name)
+    logging.info("Done making collision free index")
+
 
 def make_reverse(args):
     flat = FlatKmers.from_file(args.flat_index)
@@ -65,6 +74,11 @@ def run_argument_parser(args):
     subparser.add_argument("-o", "--out_file_name", required=True)
     subparser.add_argument("files", nargs="+")
     subparser.set_defaults(func=merge_indexes)
+
+    subparser = subparsers.add_parser("make_collision_free")
+    subparser.add_argument("-o", "--out_file_name", required=True)
+    subparser.add_argument("--flat-index", required=True)
+    subparser.set_defaults(func=make_collision_free)
 
     subparser = subparsers.add_parser("make_reverse")
     subparser.add_argument("-f", "--flat-index", required=True)

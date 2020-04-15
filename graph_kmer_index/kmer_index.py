@@ -6,7 +6,7 @@ from .flat_kmers import FlatKmers
 
 
 class KmerIndex:
-    def __init__(self, hasher, hashes_to_index, n_kmers, nodes, ref_offsets):
+    def __init__(self, hasher, hashes_to_index, n_kmers, nodes, ref_offsets, kmers=None):
         self._hasher = hasher
         if hashes_to_index.dtype != np.int:
             self._hashes_to_index = np.array(hashes_to_index, dtype=np.int)
@@ -15,6 +15,8 @@ class KmerIndex:
         self._n_kmers = n_kmers
         self._nodes = nodes
         self._ref_offsets = ref_offsets
+        self._kmers = kmers  # Actual numeric kmers (not hashes of numeric kmers) at each position
+                             # used to filter out collisions
 
     @classmethod
     def from_raw_arrays(cls, hashes, nodes, ref_offsets):
@@ -68,13 +70,17 @@ class KmerIndex:
         np.savez(file_name, hashes_to_index=self._hashes_to_index,
                  n_kmers=self._n_kmers,
                  nodes=self._nodes,
-                 ref_offsets=self._ref_offsets)
+                 ref_offsets=self._ref_offsets,
+                 kmers=self._kmers if type(self._kmers) == np.ndarray else np.zeros(0))
 
     @classmethod
     def from_file(cls, file_name):
         hasher = ModuloHashMap.from_file(file_name + ".hasher")
         data = np.load(file_name + ".npz")
-        return cls(hasher, data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"])
+        kmers = None
+        if "kmers" in data:
+            kmers = data["kmers"]
+        return cls(hasher, data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], kmers)
 
     @classmethod
     def from_multiple_flat_kmers(cls, flat_kmers_list):
@@ -106,7 +112,7 @@ class KmerIndex:
         hashes_to_index = np.nonzero(diffs)[0]
         n_kmers = np.ediff1d(hashes_to_index, to_end=len(nodes)-hashes_to_index[-1])
 
-        return cls(hasher, hashes_to_index, n_kmers, nodes, ref_offsets)
+        return cls(hasher, hashes_to_index, n_kmers, nodes, ref_offsets, hashes)
 
 
 def test_from_single_flat_kmers():

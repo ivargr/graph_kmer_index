@@ -10,7 +10,8 @@ cpdef tuple get_nodes_and_ref_offsets_from_multiple_kmers(np.ndarray[np.int64_t]
                                                   np.ndarray[np.int64_t] hashes_to_index,
                                                   np.ndarray[np.int64_t] n_kmers,
                                                   np.ndarray[np.uint32_t] nodes,
-                                                  np.ndarray[np.uint32_t] ref_offsets):
+                                                  np.ndarray[np.uint32_t] ref_offsets
+                                                  ):
 
     cdef np.ndarray[np.int64_t, ndim=1] kmer_hashes = np.zeros(kmers.shape[0], dtype=np.int)
     kmer_hashes = np.mod(kmers, 452930477)
