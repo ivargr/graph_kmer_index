@@ -1,12 +1,9 @@
 import numpy as np
 import logging
-logging.basicConfig(level=logging.INFO)
-from .logn_hash_map import LogNHashMap, ModuloHashMap
-from .flat_kmers import FlatKmers
 
 
 class CollisionFreeKmerIndex:
-    def __init__(self, hashes_to_index, n_kmers, nodes, ref_offsets, kmers, modulo=452930477):
+    def __init__(self, hashes_to_index, n_kmers, nodes, ref_offsets, kmers, modulo=452930477, frequencies=None):
         self._hashes_to_index = hashes_to_index
         self._n_kmers = n_kmers
         self._nodes = nodes
@@ -14,37 +11,70 @@ class CollisionFreeKmerIndex:
         self._kmers = kmers  # Actual numeric kmers (not hashes of numeric kmers) at each position
                              # used to filter out collisions
         self._modulo = modulo
+        if frequencies is None:
+            self._frequencies = 0
+        else:
+            self._frequencies = frequencies
 
-    def get(self, kmer):
+    def set_frequencies(self):
+        logging.info("Setting frequencies")
+        # Count number of each kmer (not hashes, store these)
+        self._frequencies = np.zeros(len(self._kmers), dtype=np.uint16)
+        unique = np.unique(self._kmers)
+        for i, kmer in enumerate(unique):
+            if i % 100000 == 0:
+                logging.info("%d/%d kmers processed" % (i, len(unique)))
+
+            hash = int(kmer) % self._modulo
+            position = self._hashes_to_index[hash]
+            n_hits = self._n_kmers[hash]
+            start = position
+            assert start != 0 or kmer == 0, "Kmer %d with hash %d, index position %d not found in index" % (kmer, hash, position)
+            end = position + n_hits
+            hit_positions = np.where(self._kmers[start:end] == kmer)[0]
+
+            # The count is the number of unique ref positions here
+            # (since same entry can have multiple nodes, but always same ref pos)
+            count = len(set(self._ref_offsets[hit_positions + start]))
+            assert count > 0, "Count is not > 0 for kmer %d, start, end: %d,%d. Ref offsets: %s" % (kmer, start, end, self._ref_offsets[hit_positions + start])
+            self._frequencies[hit_positions + start] = count
+
+    def get(self, kmer, max_hits=10):
         hash = kmer % self._modulo
         position = self._hashes_to_index[hash]
         n_hits = self._n_kmers[hash]
         start = position
         end = position + n_hits
         hit_positions = np.where(self._kmers[start:end] == kmer)[0]
-        if len(hit_positions) == 0:
-            return None, None
-        return self._nodes[hit_positions + start], self._ref_offsets[hit_positions + start]
+        frequencies = self._frequencies[hit_positions+start]
+        if len(hit_positions) == 0 or frequencies[0] > max_hits:
+            return None, None, None
+
+        return self._nodes[hit_positions + start], self._ref_offsets[hit_positions + start], frequencies
 
     def get_nodes_and_ref_offsets_from_multiple_kmers(self, kmers):
         all_nodes = []
         all_ref_offsets = []
         all_read_offsets = []
+        all_frequencies = []
         for i, hash in enumerate(kmers):
-            nodes, ref_offsets = self.get(hash)
+            nodes, ref_offsets, frequencies = self.get(hash)
             if nodes is None:
                 continue
             all_nodes.append(nodes)
             all_ref_offsets.append(ref_offsets)
             all_read_offsets.append(np.zeros(len(nodes)) + i)
+            all_frequencies.append(frequencies)
+
 
         if len(all_nodes) == 0:
-            return np.array([]), np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([]), np.array([])
 
         all_nodes = np.concatenate(all_nodes)
         all_ref_offsets = np.concatenate(all_ref_offsets)
         all_read_offsets = np.concatenate(all_read_offsets)
-        return all_nodes, all_ref_offsets, all_read_offsets
+        all_frequencies = np.concatenate(all_frequencies)
+        return all_nodes, all_ref_offsets, all_read_offsets, all_frequencies
 
     def to_file(self, file_name):
         logging.info("Writing kmer index to file: %s" % file_name)
@@ -53,12 +83,13 @@ class CollisionFreeKmerIndex:
                  nodes=self._nodes,
                  ref_offsets=self._ref_offsets,
                  kmers=self._kmers,
-                 modulo=self._modulo)
+                 modulo=self._modulo,
+                 frequencies=self._frequencies)
 
     @classmethod
     def from_file(cls, file_name):
         data = np.load(file_name + ".npz")
-        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"])
+        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"])
 
     @classmethod
     def from_flat_kmers(cls, flat_kmers, modulo=452930477):
@@ -86,7 +117,9 @@ class CollisionFreeKmerIndex:
         n_kmers[unique_hashes] = n_entries
 
         # Find out how many entries there are for each unique hash
-        return cls(lookup, n_kmers, nodes, ref_offsets, kmers, modulo)
+        object = cls(lookup, n_kmers, nodes, ref_offsets, kmers, modulo)
+        object.set_frequencies()
+        return object
 
 
 

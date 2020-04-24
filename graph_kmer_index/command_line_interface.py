@@ -13,6 +13,8 @@ import pickle
 from .flat_kmers import FlatKmers
 from .kmer_index import KmerIndex
 from .reverse_kmer_index import ReverseKmerIndex
+from .unique_kmer_index import UniqueKmerIndex
+
 
 def main():
     run_argument_parser(sys.argv[1:])
@@ -27,7 +29,8 @@ def create_index(args):
     #critical_nodes = pickle.load(open(args.critical_nodes, "rb"))
     logging.info("Running kmerfinder")
     #finder = KmerFinder(graph, sequence_graph, critical_nodes, linear_path, k=15, store_all_kmers=False)
-    finder = SnpKmerFinder(graph, sequence_graph, linear_path, k=args.kmer_size)
+    finder = SnpKmerFinder(graph, sequence_graph, linear_path, k=args.kmer_size, spacing=args.spacing,
+                           include_reverse_complements=args.include_reverse_complement)
     kmers = finder.find_kmers()
     kmers.to_file(args.out_file_name)
     #creator.to_file(args.out_file_name)
@@ -44,7 +47,7 @@ def merge_indexes(args):
 
 def make_collision_free(args):
     flat = FlatKmers.from_file(args.flat_index)
-    index = CollisionFreeKmerIndex.from_flat_kmers(flat)
+    index = CollisionFreeKmerIndex.from_flat_kmers(flat, modulo=args.hash_modulo)
     index.to_file(args.out_file_name)
     logging.info("Done making collision free index")
 
@@ -54,6 +57,14 @@ def make_reverse(args):
     reverse = ReverseKmerIndex.from_flat_kmers(flat)
     reverse.to_file(args.out_file_name)
     logging.info("Done. Wrote reverse index to file: %s" % args.out_file_name)
+
+
+def make_unique_index(args):
+    graph = Graph.from_file(args.graph)
+    reverse = ReverseKmerIndex.from_file(args.reverse)
+    flat = FlatKmers.from_file(args.flat_index)
+    unique = UniqueKmerIndex.from_flat_kmers_and_snps_graph(flat, graph, reverse)
+    unique.to_file(args.out_file_name)
 
 
 def run_argument_parser(args):
@@ -67,7 +78,9 @@ def run_argument_parser(args):
     subparser.add_argument("-g", "--graph_file_name", required=True)
     subparser.add_argument("-o", "--out_file_name", required=True)
     subparser.add_argument("-l", "--linear_path_file_name", required=True)
-    subparser.add_argument("-k", "--kmer_size", required=False, type=int, default=32)
+    subparser.add_argument("-k", "--kmer_size", required=False, type=int, default=31)
+    subparser.add_argument("-r", "--include_reverse_complement", required=False, type=bool, default=False)
+    subparser.add_argument("-spacing", "--spacing", required=False, type=int, default=31)
     subparser.set_defaults(func=create_index)
 
     subparser = subparsers.add_parser("merge_indexes")
@@ -77,7 +90,8 @@ def run_argument_parser(args):
 
     subparser = subparsers.add_parser("make_collision_free")
     subparser.add_argument("-o", "--out_file_name", required=True)
-    subparser.add_argument("--flat-index", required=True)
+    subparser.add_argument("-f", "--flat-index", required=True)
+    subparser.add_argument("-m", "--hash_modulo", required=False, type=int, default=452930477)
     subparser.set_defaults(func=make_collision_free)
 
     subparser = subparsers.add_parser("make_reverse")
@@ -85,7 +99,12 @@ def run_argument_parser(args):
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.set_defaults(func=make_reverse)
 
-
+    subparser = subparsers.add_parser("make_unique_index", help="Make index from unique kmers in the graph to nodes that are covered by those kmers")
+    subparser.add_argument("-f", "--flat-index", required=True)
+    subparser.add_argument("-g", "--graph", required=True)
+    subparser.add_argument("-r", "--reverse", required=True)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.set_defaults(func=make_unique_index)
 
     if len(args) == 0:
         parser.print_help()

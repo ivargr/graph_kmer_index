@@ -1,6 +1,5 @@
 import numpy as np
 import logging
-logging.basicConfig(level=logging.INFO)
 from .logn_hash_map import LogNHashMap, ModuloHashMap
 from .flat_kmers import FlatKmers
 

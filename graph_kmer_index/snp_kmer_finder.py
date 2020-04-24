@@ -4,6 +4,7 @@ import numpy as np
 from offsetbasedgraph import Graph, Interval, Block, SequenceGraph
 from .flat_kmers import FlatKmers, letter_sequence_to_numeric
 from numba import jit
+from Bio.Seq import Seq
 
 
 def sequence_to_kmer_hash(sequence):
@@ -20,7 +21,7 @@ class SnpKmerFinder:
     Simple kmer finder that only supports SNP graphs
     """
 
-    def __init__(self, graph, sequence_graph, linear_ref, k=15):
+    def __init__(self, graph, sequence_graph, linear_ref, k=15, spacing=None, include_reverse_complements=False):
         self.graph = graph
         self.sequence_graph = sequence_graph
         self.linear_ref = linear_ref
@@ -34,6 +35,13 @@ class SnpKmerFinder:
         self._nodes_in_path = []
         self._kmers_found = 0
         self._current_ref_offset = None
+        if spacing is None:
+            self.spacing = k
+        else:
+            self.spacing = spacing
+        self._include_reverse_complements=include_reverse_complements
+        if self._include_reverse_complements:
+            logging.info("Will include reverse complement of kmers")
 
 
     def has_kmer(self, kmer, nodes):
@@ -50,10 +58,18 @@ class SnpKmerFinder:
             self.kmers_found.append((kmer, nodes))
 
         hash = kmer_to_hash_fast(letter_sequence_to_numeric(kmer), k=len(kmer))
+        if self._include_reverse_complements:
+            rev_hash = kmer_to_hash_fast(letter_sequence_to_numeric(str(Seq(kmer).reverse_complement())), k=len(kmer))
         for node in nodes:
             self._hashes.append(hash)
             self._nodes.append(node)
             self._ref_offsets.append(self._current_ref_offset)
+
+            if self._include_reverse_complements:
+                self._hashes.append(rev_hash)
+                self._nodes.append(node)
+                self._ref_offsets.append(self._current_ref_offset)
+
 
     def _find_all_variant_kmers_from_position(self, linear_ref_pos):
         self._current_ref_offset = linear_ref_pos
@@ -113,8 +129,8 @@ class SnpKmerFinder:
 
 
     def find_kmers(self):
-        for i in range(0, self.linear_ref.length() // self.k):
-            pos = i * self.k
+        for i in range(0, self.linear_ref.length() // self.spacing):
+            pos = i * self.spacing
             if i % 10000 == 0:
                 logging.info("On ref position %d. %d kmers found" % (pos, self._kmers_found))
             #if pos > 3000000:
