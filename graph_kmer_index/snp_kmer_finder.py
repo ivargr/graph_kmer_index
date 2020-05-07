@@ -21,12 +21,10 @@ class SnpKmerFinder:
     Simple kmer finder that only supports SNP graphs
     """
 
-    def __init__(self, graph, sequence_graph, linear_ref, k=15, spacing=None, include_reverse_complements=False):
+    def __init__(self, graph, k=15, spacing=None, include_reverse_complements=False):
         self.graph = graph
-        self.sequence_graph = sequence_graph
-        self.linear_ref = linear_ref
         self.k = k
-        self.linear_nodes = linear_ref.nodes_in_interval()
+        self.linear_nodes = graph.linear_ref_nodes()
         self._hashes = []
         self._nodes = []
         self._ref_offsets = []
@@ -78,11 +76,11 @@ class SnpKmerFinder:
         # this lets us catch cases where we are at a beginning of a node
 
         if linear_ref_pos > 0:
-            node = self.linear_ref.get_node_at_offset(linear_ref_pos-1)
-            offset = self.linear_ref.get_node_offset_at_offset(linear_ref_pos-1) + 1
+            node = self.graph.get_node_at_ref_offset(linear_ref_pos-1)
+            offset = self.graph.get_node_offset_at_ref_offset(linear_ref_pos-1) + 1
         else:
-            node = self.linear_ref.get_node_at_offset(linear_ref_pos)
-            offset = self.linear_ref.get_node_offset_at_offset(linear_ref_pos)
+            node = self.graph.get_node_at_ref_offset(linear_ref_pos)
+            offset = self.graph.get_node_offset_at_ref_offset(linear_ref_pos)
 
         self._bases_in_search_path = []
         self._nodes_in_path = []
@@ -98,8 +96,8 @@ class SnpKmerFinder:
             return
 
         # Process the rest of this node
-        node_size = int(self.graph.blocks[node].length())
-        node_sequence = self.sequence_graph.get_node_sequence(node)
+        node_size = int(self.graph.nodes[node])
+        node_sequence = self.graph.get_node_sequence(node)
         for node_position in range(int(offset), node_size):
             base = node_sequence[node_position]
             #logging.info("   Adding base %s at node %d, pos %d" % (base, node, node_position))
@@ -114,7 +112,7 @@ class SnpKmerFinder:
                 return
 
         # If offset is last base in this node, recursively search next nodes depth first
-        next_nodes = self.graph.adj_list[node]
+        next_nodes = self.graph.get_edges(node)
         bases_so_far = len(self._bases_in_search_path)
         for next_node in next_nodes:
             # After a search, reset the bases in search path back to where it was
@@ -129,7 +127,7 @@ class SnpKmerFinder:
 
 
     def find_kmers(self):
-        for i in range(0, self.linear_ref.length() // self.spacing):
+        for i in range(0, self.graph.linear_ref_length() // self.spacing):
             pos = i * self.spacing
             if i % 10000 == 0:
                 logging.info("On ref position %d. %d kmers found" % (pos, self._kmers_found))
@@ -138,7 +136,7 @@ class SnpKmerFinder:
             self._find_kmers_from_linear_ref_position(pos)
 
         logging.info("Done finding all kmers")
-        return FlatKmers(np.array(self._hashes, dtype=np.uint64), np.array(self._nodes, np.uint32), np.array(self._ref_offsets, np.uint32))
+        return FlatKmers(np.array(self._hashes, dtype=np.uint64), np.array(self._nodes, np.uint32), np.array(self._ref_offsets, np.uint64))
 
 
 

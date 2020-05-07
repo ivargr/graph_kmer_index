@@ -5,7 +5,7 @@ import logging
 from .collision_free_kmer_index import CollisionFreeKmerIndex
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
-from offsetbasedgraph import Graph, SequenceGraph, NumpyIndexedInterval
+from obgraph import Graph
 from vcfmap import VcfMap
 from .index_creator import IndexCreator
 from .snp_kmer_finder import SnpKmerFinder
@@ -23,13 +23,8 @@ def main():
 def create_index(args):
     logging.info("Loading data")
     graph = Graph.from_file(args.graph_file_name)
-    sequence_graph = SequenceGraph.from_file(args.graph_file_name + ".sequences")
-    #vcfmap = VcfMap.from_file(args.vcfmap_file_name)
-    linear_path = NumpyIndexedInterval.from_file(args.linear_path_file_name)
-    #critical_nodes = pickle.load(open(args.critical_nodes, "rb"))
     logging.info("Running kmerfinder")
-    #finder = KmerFinder(graph, sequence_graph, critical_nodes, linear_path, k=15, store_all_kmers=False)
-    finder = SnpKmerFinder(graph, sequence_graph, linear_path, k=args.kmer_size, spacing=args.spacing,
+    finder = SnpKmerFinder(graph, k=args.kmer_size, spacing=args.spacing,
                            include_reverse_complements=args.include_reverse_complement)
     kmers = finder.find_kmers()
     kmers.to_file(args.out_file_name)
@@ -77,7 +72,6 @@ def run_argument_parser(args):
     subparser = subparsers.add_parser("make")
     subparser.add_argument("-g", "--graph_file_name", required=True)
     subparser.add_argument("-o", "--out_file_name", required=True)
-    subparser.add_argument("-l", "--linear_path_file_name", required=True)
     subparser.add_argument("-k", "--kmer_size", required=False, type=int, default=31)
     subparser.add_argument("-r", "--include_reverse_complement", required=False, type=bool, default=False)
     subparser.add_argument("-spacing", "--spacing", required=False, type=int, default=31)
