@@ -29,7 +29,7 @@ class CollisionFreeKmerIndex:
             position = self._hashes_to_index[hash]
             n_hits = self._n_kmers[hash]
             start = position
-            assert start != 0 or kmer == 0, "Kmer %d with hash %d, index position %d not found in index" % (kmer, hash, position)
+            assert start != 0 or hash == 0, "Kmer %d with hash %d, index position %d not found in index" % (kmer, hash, position)
             end = position + n_hits
             hit_positions = np.where(self._kmers[start:end] == kmer)[0]
 
@@ -88,7 +88,11 @@ class CollisionFreeKmerIndex:
 
     @classmethod
     def from_file(cls, file_name):
-        data = np.load(file_name + ".npz")
+        try:
+            data = np.load(file_name + ".npz")
+        except FileNotFoundError:
+            data = np.load(file_name)
+
         return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"])
 
     @classmethod

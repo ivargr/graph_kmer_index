@@ -37,7 +37,11 @@ class ReverseKmerIndex:
 
     @classmethod
     def from_file(cls, file_name):
-        data = np.load(file_name)
+        try:
+            data = np.load(file_name)
+        except FileNotFoundError:
+            data = np.load(file_name + ".npz")
+
         return cls(data["nodes_to_index_positions"], data["nodes_to_n_hashes"], data["hashes"], data["ref_positions"])
 
     def to_file(self, file_name):
@@ -59,7 +63,6 @@ class ReverseKmerIndex:
         nodes_index = np.zeros(max_node+1)
         n_kmers = np.zeros(max_node+1)
         sorted_nodes = np.argsort(nodes)
-        print(sorted_nodes)
         nodes = nodes[sorted_nodes]
         kmers = kmers[sorted_nodes]
         ref_positions = ref_positions[sorted_nodes]
