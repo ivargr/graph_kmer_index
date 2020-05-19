@@ -11,7 +11,6 @@ from .index_creator import IndexCreator
 from .snp_kmer_finder import SnpKmerFinder
 import pickle
 from .flat_kmers import FlatKmers
-from .kmer_index import KmerIndex
 from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
 
@@ -31,20 +30,11 @@ def create_index(args):
     #creator.to_file(args.out_file_name)
 
 
-def merge_indexes(args):
-    indexes = []
-    for file_name in args.files:
-        indexes.append(FlatKmers.from_file(file_name))
-
-    index = KmerIndex.from_multiple_flat_kmers(indexes)
-    index.to_file(args.out_file_name)
-    logging.info("Done")
-
-def make_collision_free(args):
+def make_from_flat(args):
     flat = FlatKmers.from_file(args.flat_index)
     index = CollisionFreeKmerIndex.from_flat_kmers(flat, modulo=args.hash_modulo)
     index.to_file(args.out_file_name)
-    logging.info("Done making collision free index")
+    logging.info("Done making kmer index")
 
 
 def make_reverse(args):
@@ -77,16 +67,11 @@ def run_argument_parser(args):
     subparser.add_argument("-spacing", "--spacing", required=False, type=int, default=31)
     subparser.set_defaults(func=create_index)
 
-    subparser = subparsers.add_parser("merge_indexes")
-    subparser.add_argument("-o", "--out_file_name", required=True)
-    subparser.add_argument("files", nargs="+")
-    subparser.set_defaults(func=merge_indexes)
-
-    subparser = subparsers.add_parser("make_collision_free")
+    subparser = subparsers.add_parser("make_from_flat")
     subparser.add_argument("-o", "--out_file_name", required=True)
     subparser.add_argument("-f", "--flat-index", required=True)
     subparser.add_argument("-m", "--hash_modulo", required=False, type=int, default=452930477)
-    subparser.set_defaults(func=make_collision_free)
+    subparser.set_defaults(func=make_from_flat)
 
     subparser = subparsers.add_parser("make_reverse")
     subparser.add_argument("-f", "--flat-index", required=True)
