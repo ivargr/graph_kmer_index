@@ -22,7 +22,7 @@ setup(name='graph_kmer_index',
       license='MIT',
       packages=["graph_kmer_index"],
       zip_safe=False,
-      install_requires=['numpy', 'sortedcontainers', 'tqdm'],
+      install_requires=['numpy', 'sortedcontainers', 'tqdm', 'biopython'],
       classifiers=[
             'Programming Language :: Python :: 3'
       ],

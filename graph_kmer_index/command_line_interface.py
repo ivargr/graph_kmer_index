@@ -1,12 +1,12 @@
 import sys
 import argparse
 import logging
+from multiprocessing import shared_memory
 
 from .collision_free_kmer_index import CollisionFreeKmerIndex
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 from obgraph import Graph
-from vcfmap import VcfMap
 from .index_creator import IndexCreator
 from .snp_kmer_finder import SnpKmerFinder
 import pickle
@@ -24,7 +24,11 @@ def create_index(args):
     graph = Graph.from_file(args.graph_file_name)
     logging.info("Running kmerfinder")
     finder = SnpKmerFinder(graph, k=args.kmer_size, spacing=args.spacing,
-                           include_reverse_complements=args.include_reverse_complement)
+                           include_reverse_complements=args.include_reverse_complement,
+                           pruning=args.pruning,
+                           max_kmers_same_position=args.max_kmers_same_position,
+                           max_frequency=args.max_frequency,
+                           max_variant_nodes=args.max_variant_nodes)
     kmers = finder.find_kmers()
     kmers.to_file(args.out_file_name)
     #creator.to_file(args.out_file_name)
@@ -64,7 +68,12 @@ def run_argument_parser(args):
     subparser.add_argument("-o", "--out_file_name", required=True)
     subparser.add_argument("-k", "--kmer_size", required=False, type=int, default=31)
     subparser.add_argument("-r", "--include_reverse_complement", required=False, type=bool, default=False)
-    subparser.add_argument("-spacing", "--spacing", required=False, type=int, default=31)
+    subparser.add_argument("-s", "--spacing", required=False, type=int, default=31)
+    subparser.add_argument("-p", "--pruning", required=False, type=bool, default=False, help="Set to True to prune unecessary kmers")
+    subparser.add_argument("-m", "--max-kmers-same-position", required=False, type=int, default=100000, help="Maximum number of kmers allowd to be added from the same ref position")
+    subparser.add_argument("-M", "--max-frequency", required=False, type=int, default=100000, help="Skip kmers with frequency higher than this. Will never skip kmers crossing variants.")
+    subparser.add_argument("-v", "--max-variant-nodes", required=False, type=int, default=100000, help="Max variant nodes allowed in kmer.")
+
     subparser.set_defaults(func=create_index)
 
     subparser = subparsers.add_parser("make_from_flat")

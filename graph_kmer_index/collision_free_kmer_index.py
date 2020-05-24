@@ -1,9 +1,20 @@
 import numpy as np
 import logging
+import pickle
 
 
 class CollisionFreeKmerIndex:
-    def __init__(self, hashes_to_index, n_kmers, nodes, ref_offsets, kmers, modulo=452930477, frequencies=None):
+    properties = {
+            "_hashes_to_index",
+            "_n_kmers",
+            "_nodes",
+            "_ref_offsets",
+            "_kmers",
+            "_modulo",
+            "_frequencies"
+        }
+
+    def __init__(self, hashes_to_index=None, n_kmers=None, nodes=None, ref_offsets=None, kmers=None, modulo=452930477, frequencies=None):
         self._hashes_to_index = hashes_to_index
         self._n_kmers = n_kmers
         self._nodes = nodes

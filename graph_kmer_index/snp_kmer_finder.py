@@ -5,6 +5,7 @@ from offsetbasedgraph import Graph, Interval, Block, SequenceGraph
 from .flat_kmers import FlatKmers, letter_sequence_to_numeric
 from numba import jit
 from Bio.Seq import Seq
+from collections import defaultdict
 
 
 def sequence_to_kmer_hash(sequence):
@@ -21,7 +22,8 @@ class SnpKmerFinder:
     Simple kmer finder that only supports SNP graphs
     """
 
-    def __init__(self, graph, k=15, spacing=None, include_reverse_complements=False):
+    def __init__(self, graph, k=15, spacing=None, include_reverse_complements=False, pruning=False, max_kmers_same_position=100000,
+                 max_frequency=10000, max_variant_nodes=10000):
         self.graph = graph
         self.k = k
         self.linear_nodes = graph.linear_ref_nodes()
@@ -33,6 +35,26 @@ class SnpKmerFinder:
         self._nodes_in_path = []
         self._kmers_found = 0
         self._current_ref_offset = None
+        self._last_ref_pos_added = 0
+        self.pruning = pruning
+        self._n_kmers_pruned = 0
+        self._has_traversed_variant = False
+        self._unique_kmers_added = set()
+        self._max_kmers_same_position = max_kmers_same_position
+        self._n_kmers_added_current_position = 0
+        self._n_kmers_skipped = 0
+        self._kmer_frequencies = defaultdict(int)
+        self._max_frequency = max_frequency
+        self._n_skipped_due_to_frequency = 0
+        self._max_variant_nodes = max_variant_nodes
+        self._n_skipped_due_to_max_variant_nodes = 0
+
+
+        if self.pruning:
+            logging.info("Will do pruning")
+        else:
+            logging.info("No pruning will be performed, all kmers will be reported")
+
         if spacing is None:
             self.spacing = k
         else:
@@ -50,14 +72,35 @@ class SnpKmerFinder:
 
     def _add_kmer(self, kmer, nodes):
         #logging.info("Adding kmer %s, %s" % (kmer, nodes))
-        self._kmers_found += 1
-        if len(self.kmers_found) < 200:
-            # Only add to this when there is little data, only used for testing
-            self.kmers_found.append((kmer, nodes))
 
         hash = kmer_to_hash_fast(letter_sequence_to_numeric(kmer), k=len(kmer))
+
+        if self._kmer_frequencies[hash] > self._max_frequency:
+            self._n_skipped_due_to_frequency += 1
+            return
+
+        if self.pruning and hash not in self._unique_kmers_added:
+            if self._last_ref_pos_added != self._current_ref_offset and self._last_ref_pos_added > self._current_ref_offset - 124:
+                if not self._has_traversed_variant:
+                    # Do not add
+                    self._n_kmers_pruned += 1
+                    return
+
+        if self._n_kmers_added_current_position > self._max_kmers_same_position:
+            self._n_kmers_skipped += 1
+            return
+
+        n_variant_nodes = len([n for n in nodes if n not in self.linear_nodes])
+        if n_variant_nodes > self._max_variant_nodes:
+            self._n_skipped_due_to_max_variant_nodes += 1
+            return
+
         if self._include_reverse_complements:
             rev_hash = kmer_to_hash_fast(letter_sequence_to_numeric(str(Seq(kmer).reverse_complement())), k=len(kmer))
+
+        self._unique_kmers_added.add(hash)
+        self._kmer_frequencies[hash] += 1
+
         for node in nodes:
             self._hashes.append(hash)
             self._nodes.append(node)
@@ -68,6 +111,14 @@ class SnpKmerFinder:
                 self._nodes.append(node)
                 self._ref_offsets.append(self._current_ref_offset)
 
+        self._last_ref_pos_added = self._current_ref_offset
+
+        self._kmers_found += 1
+        if len(self.kmers_found) < 200:
+            # Only add to this when there is little data, only used for testing
+            self.kmers_found.append((kmer, nodes))
+
+        self._n_kmers_added_current_position += 1
 
     def _find_all_variant_kmers_from_position(self, linear_ref_pos):
         self._current_ref_offset = linear_ref_pos
@@ -84,7 +135,10 @@ class SnpKmerFinder:
 
         self._bases_in_search_path = []
         self._nodes_in_path = []
+        self._has_traversed_variant = False
+        self._n_kmers_added_current_position = 0
         self._search_graph_from(node, offset, self.k)
+
 
 
     def _search_graph_from(self, node, offset, bases_left):
@@ -113,6 +167,13 @@ class SnpKmerFinder:
 
         # If offset is last base in this node, recursively search next nodes depth first
         next_nodes = self.graph.get_edges(node)
+        if len(next_nodes) > 1:
+            self._has_traversed_variant = True
+
+        # Prioritize linear ref node
+        if len(next_nodes) > 0 and next_nodes[0] not in self.linear_nodes:
+            next_nodes = list(reversed(next_nodes))
+
         bases_so_far = len(self._bases_in_search_path)
         for next_node in next_nodes:
             # After a search, reset the bases in search path back to where it was
@@ -130,7 +191,9 @@ class SnpKmerFinder:
         for i in range(0, self.graph.linear_ref_length() // self.spacing):
             pos = i * self.spacing
             if i % 10000 == 0:
-                logging.info("On ref position %d. %d kmers found" % (pos, self._kmers_found))
+                logging.info("On ref position %d. %d kmers found. Have pruned %d kmers. "
+                             "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d"
+                             % (pos, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes))
             #if pos > 3000000:
             #break
             self._find_kmers_from_linear_ref_position(pos)

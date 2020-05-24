@@ -27,10 +27,7 @@ cdef class CythonKmerIndex:
     cdef unsigned long[:] kmers
     cdef long modulo
     cdef unsigned long *hashes
-    cdef unsigned int[:] node_hits
     cdef unsigned short[:] frequencies
-    cdef unsigned long[:] ref_offsets_hits
-    cdef unsigned int[:] read_offsets_hits
 
     def __init__(self, index):
         self.hashes_to_index = index._hashes_to_index
@@ -40,14 +37,11 @@ cdef class CythonKmerIndex:
         self.kmers = index._kmers
         self.frequencies = index._frequencies
         self.modulo = index._modulo
-        self.ref_offsets_hits = np.empty(0, dtype=np.uint64)
-        self.node_hits = np.empty(0, dtype=np.uint32)
-        self.read_offsets_hits = np.empty(0, dtype=np.uint32)
 
     @cython.cdivision(True)
     @cython.boundscheck(False)
     @cython.unraisable_tracebacks(True)
-    cpdef int get(self, unsigned long[:] kmers):
+    cpdef np.ndarray[np.uint64_t, ndim=2] get(self, unsigned long[:] kmers):
         cdef int n = kmers.shape[0]
         cdef unsigned long[:] kmer_hashes = modulo_of_array(kmers, self.modulo)
         cdef int n_total_hits = 0
@@ -70,16 +64,14 @@ cdef class CythonKmerIndex:
                 if self.kmers[index_position+j] != kmers[i]:
                     continue
 
-                if self.frequencies[index_position+j] > 5:
+                if self.frequencies[index_position+j] > 50:
                     continue
                 n_total_hits += 1
 
-        self.node_hits = np.empty(n_total_hits, dtype=np.uint32)
-        self.ref_offsets_hits = np.empty(n_total_hits, dtype=np.uint64)
-        self.read_offsets_hits = np.empty(n_total_hits, dtype=np.uint32)
+        cdef np.ndarray[np.uint64_t, ndim=2] output_data = np.zeros((3, n_total_hits), dtype=np.uint64)
 
         if n_total_hits == 0:
-            return 0
+            output_data
 
         # Get the actual hits
         cdef int counter = 0
@@ -101,21 +93,15 @@ cdef class CythonKmerIndex:
             for j in range(n_local_hits):
                 if self.kmers[index_position+j] != kmers[i]:
                     continue
-                if self.frequencies[index_position+j] > 5:
+                if self.frequencies[index_position+j] > 50:
                     continue
-                self.node_hits[counter] = self.nodes[index_position+j]
-                self.ref_offsets_hits[counter] = self.ref_offsets[index_position+j]
-                self.read_offsets_hits[counter] = i
+                output_data[0, counter] = self.nodes[index_position+j]
+                output_data[1, counter] = self.ref_offsets[index_position+j]
+                output_data[2, counter] = i
+
                 counter += 1
 
-    cpdef unsigned long[:] get_ref_offsets_hits(self):
-        return self.ref_offsets_hits
-
-    cpdef unsigned int[:] get_node_hits(self):
-        return self.node_hits
-
-    cpdef unsigned int[:] get_read_offsets_hits(self):
-        return self.read_offsets_hits
+        return output_data
 
 
 cpdef test(index):
