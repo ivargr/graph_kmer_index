@@ -1,7 +1,7 @@
 import sys
 import argparse
 import logging
-from multiprocessing import shared_memory
+#from multiprocessing import shared_memory
 
 from .collision_free_kmer_index import CollisionFreeKmerIndex
 
@@ -13,6 +13,7 @@ import pickle
 from .flat_kmers import FlatKmers
 from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
+from .reference_kmer_index import ReferenKmerIndex
 
 
 def main():
@@ -46,6 +47,13 @@ def make_reverse(args):
     reverse = ReverseKmerIndex.from_flat_kmers(flat)
     reverse.to_file(args.out_file_name)
     logging.info("Done. Wrote reverse index to file: %s" % args.out_file_name)
+
+
+def make_reference_kmer_index(args):
+    flat = FlatKmers.from_file(args.flat_index)
+    index = ReferenKmerIndex.from_flat_kmers(flat)
+    index.to_file(args.out_file_name)
+    logging.info("Saved reference kmer index to file %s" % args.out_file_name)
 
 
 def make_unique_index(args):
@@ -93,6 +101,12 @@ def run_argument_parser(args):
     subparser.add_argument("-r", "--reverse", required=True)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.set_defaults(func=make_unique_index)
+
+    subparser = subparsers.add_parser("make_reference_kmer_index", help="Make index that allows lookup between two ref positions")
+    subparser.add_argument("-f", "--flat-index", required=True)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.set_defaults(func=make_reference_kmer_index)
+
 
     if len(args) == 0:
         parser.print_help()

@@ -75,7 +75,7 @@ class SnpKmerFinder:
 
         hash = kmer_to_hash_fast(letter_sequence_to_numeric(kmer), k=len(kmer))
 
-        if self._kmer_frequencies[hash] > self._max_frequency:
+        if self._kmer_frequencies[hash] >= self._max_frequency:
             self._n_skipped_due_to_frequency += 1
             return
 
@@ -91,7 +91,7 @@ class SnpKmerFinder:
             return
 
         n_variant_nodes = len([n for n in nodes if n not in self.linear_nodes])
-        if n_variant_nodes > self._max_variant_nodes:
+        if n_variant_nodes >= self._max_variant_nodes:
             self._n_skipped_due_to_max_variant_nodes += 1
             return
 
