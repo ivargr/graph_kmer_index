@@ -14,7 +14,11 @@ class FlatKmers:
 
     @classmethod
     def from_file(cls, file_name):
-        data = np.load(file_name)
+        try:
+            data = np.load(file_name)
+        except FileNotFoundError:
+            data = np.load(file_name + ".npz")
+
         logging.info("Loaded kmers from %s" % file_name)
         return cls(data["hashes"], data["nodes"], data["ref_offsets"])
 
@@ -25,7 +29,7 @@ class FlatKmers:
 
 def letter_sequence_to_numeric(sequence):
     if not isinstance(sequence, np.ndarray):
-        sequence = np.array(list(sequence.lower()))
+        sequence = np.array(list(sequence.lower()), dtype="<U1")
 
     numeric = np.zeros_like(sequence, dtype=np.int64)
     numeric[np.where(sequence == "n")[0]] = 0

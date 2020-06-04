@@ -2,6 +2,7 @@ import sys
 import argparse
 import logging
 #from multiprocessing import shared_memory
+import numpy as np
 
 from .collision_free_kmer_index import CollisionFreeKmerIndex
 
@@ -13,7 +14,7 @@ import pickle
 from .flat_kmers import FlatKmers
 from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
-from .reference_kmer_index import ReferenKmerIndex
+from .reference_kmer_index import ReferenceKmerIndex
 
 
 def main():
@@ -24,12 +25,20 @@ def create_index(args):
     logging.info("Loading data")
     graph = Graph.from_file(args.graph_file_name)
     logging.info("Running kmerfinder")
+    whitelist = None
+    if args.whitelist is not None:
+        w = FlatKmers.from_file(args.whitelist)
+        whitelist = set(w._hashes)
+
     finder = SnpKmerFinder(graph, k=args.kmer_size, spacing=args.spacing,
                            include_reverse_complements=args.include_reverse_complement,
                            pruning=args.pruning,
                            max_kmers_same_position=args.max_kmers_same_position,
                            max_frequency=args.max_frequency,
-                           max_variant_nodes=args.max_variant_nodes)
+                           max_variant_nodes=args.max_variant_nodes,
+                           only_add_variant_kmers=args.only_add_variant_kmers,
+                           whitelist=whitelist,
+                           only_save_variant_nodes=args.only_save_variant_nodes)
     kmers = finder.find_kmers()
     kmers.to_file(args.out_file_name)
     #creator.to_file(args.out_file_name)
@@ -50,8 +59,13 @@ def make_reverse(args):
 
 
 def make_reference_kmer_index(args):
-    flat = FlatKmers.from_file(args.flat_index)
-    index = ReferenKmerIndex.from_flat_kmers(flat)
+    if args.reference_fasta is not None:
+        logging.info("Making from a linear reference")
+        index = ReferenceKmerIndex.from_linear_reference(args.reference_fasta, args.reference_name, args.kmer_size, args.only_store_kmers)
+    else:
+        flat = FlatKmers.from_file(args.flat_index)
+        index = ReferenceKmerIndex.from_flat_kmers(flat)
+
     index.to_file(args.out_file_name)
     logging.info("Saved reference kmer index to file %s" % args.out_file_name)
 
@@ -62,6 +76,40 @@ def make_unique_index(args):
     flat = FlatKmers.from_file(args.flat_index)
     unique = UniqueKmerIndex.from_flat_kmers_and_snps_graph(flat, graph, reverse)
     unique.to_file(args.out_file_name)
+
+
+def prune_flat_kmers(args):
+    index = FlatKmers.from_file(args.flat_index)
+    new_hashes = []
+    new_nodes = []
+    new_ref_offsets = []
+
+    prev_hash = -1
+    prev_ref_offset = -1
+    n_skipped = 0
+    for i in range(len(index._hashes)):
+        if i % 1000000 == 0:
+            logging.info("%d processed, %d skipped" % (i, n_skipped))
+
+        if index._hashes[i] == prev_hash and index._ref_offsets[i] == prev_ref_offset:
+            n_skipped += 1
+            continue
+
+
+        new_hashes.append(index._hashes[i])
+        new_nodes.append(index._nodes[i])
+        new_ref_offsets.append(index._ref_offsets[i])
+
+        prev_hash = index._hashes[i]
+        prev_ref_offset = index._ref_offsets[i]
+
+    new = FlatKmers(
+        np.array(new_hashes, dtype=index._hashes.dtype),
+        np.array(new_nodes, dtype=index._nodes.dtype),
+        np.array(new_ref_offsets, dtype=index._ref_offsets.dtype),
+    )
+
+    new.to_file(args.out_file_name)
 
 
 def run_argument_parser(args):
@@ -79,8 +127,11 @@ def run_argument_parser(args):
     subparser.add_argument("-s", "--spacing", required=False, type=int, default=31)
     subparser.add_argument("-p", "--pruning", required=False, type=bool, default=False, help="Set to True to prune unecessary kmers")
     subparser.add_argument("-m", "--max-kmers-same-position", required=False, type=int, default=100000, help="Maximum number of kmers allowd to be added from the same ref position")
-    subparser.add_argument("-M", "--max-frequency", required=False, type=int, default=100000, help="Skip kmers with frequency higher than this. Will never skip kmers crossing variants.")
+    subparser.add_argument("-M", "--max-frequency", required=False, type=int, default=10000000, help="Skip kmers with frequency higher than this. Will never skip kmers crossing variants.")
     subparser.add_argument("-v", "--max-variant-nodes", required=False, type=int, default=100000, help="Max variant nodes allowed in kmer.")
+    subparser.add_argument("-V", "--only-add-variant-kmers", required=False, type=bool, default=False)
+    subparser.add_argument("-N", "--only-save-variant-nodes", required=False, type=bool, default=False)
+    subparser.add_argument("-w", "--whitelist", required=False, help="Only add kmers in this whitelist (should be a flat kmers file)")
 
     subparser.set_defaults(func=create_index)
 
@@ -103,10 +154,20 @@ def run_argument_parser(args):
     subparser.set_defaults(func=make_unique_index)
 
     subparser = subparsers.add_parser("make_reference_kmer_index", help="Make index that allows lookup between two ref positions")
-    subparser.add_argument("-f", "--flat-index", required=True)
+    subparser.add_argument("-f", "--flat-index", required=False, help="If set, will create from flat kmers")
+    subparser.add_argument("-r", "--reference-fasta", required=False, help="If set, will create from a linear reference")
+    subparser.add_argument("-n", "--reference-name", required=False, help="Only needed if creating from linear reference")
+    subparser.add_argument("-k", "--kmer-size", required=False, type=int, default=16, help="Only needed if making from linear fasta")
     subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.add_argument("-O", "--only-store-kmers", required=False, default=False, type=bool, help="Can be used when making from fasta file, will then not store the index since an index is not needed")
+
     subparser.set_defaults(func=make_reference_kmer_index)
 
+
+    subparser = subparsers.add_parser("prune_flat_kmers")
+    subparser.add_argument("-f", "--flat-index", required=True)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.set_defaults(func=prune_flat_kmers)
 
     if len(args) == 0:
         parser.print_help()

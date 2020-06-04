@@ -64,7 +64,7 @@ cdef class CythonKmerIndex:
                 if self.kmers[index_position+j] != kmers[i]:
                     continue
 
-                if self.frequencies[index_position+j] > 50:
+                if self.frequencies[index_position+j] > 20:
                     continue
                 n_total_hits += 1
 
@@ -93,7 +93,7 @@ cdef class CythonKmerIndex:
             for j in range(n_local_hits):
                 if self.kmers[index_position+j] != kmers[i]:
                     continue
-                if self.frequencies[index_position+j] > 50:
+                if self.frequencies[index_position+j] > 20:
                     continue
                 output_data[0, counter] = self.nodes[index_position+j]
                 output_data[1, counter] = self.ref_offsets[index_position+j]

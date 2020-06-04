@@ -40,7 +40,7 @@ class CollisionFreeKmerIndex:
             position = self._hashes_to_index[hash]
             n_hits = self._n_kmers[hash]
             start = position
-            assert start != 0 or hash == 0, "Kmer %d with hash %d, index position %d not found in index" % (kmer, hash, position)
+            #assert start != 0 or hash == 0, "Kmer %d with hash %d, index position %d not found in index" % (kmer, hash, position)
             end = position + n_hits
             hit_positions = np.where(self._kmers[start:end] == kmer)[0]
 

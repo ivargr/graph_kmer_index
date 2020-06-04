@@ -1,4 +1,4 @@
-from graph_kmer_index import ReferenKmerIndex
+from graph_kmer_index import ReferenceKmerIndex
 from graph_kmer_index import FlatKmers
 import numpy as np
 

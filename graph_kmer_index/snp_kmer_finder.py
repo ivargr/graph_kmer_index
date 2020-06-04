@@ -23,7 +23,7 @@ class SnpKmerFinder:
     """
 
     def __init__(self, graph, k=15, spacing=None, include_reverse_complements=False, pruning=False, max_kmers_same_position=100000,
-                 max_frequency=10000, max_variant_nodes=10000):
+                 max_frequency=10000, max_variant_nodes=10000, only_add_variant_kmers=False, whitelist=None, only_save_variant_nodes=False):
         self.graph = graph
         self.k = k
         self.linear_nodes = graph.linear_ref_nodes()
@@ -48,7 +48,23 @@ class SnpKmerFinder:
         self._n_skipped_due_to_frequency = 0
         self._max_variant_nodes = max_variant_nodes
         self._n_skipped_due_to_max_variant_nodes = 0
+        self._only_add_variant_kmers = only_add_variant_kmers
+        self._whitelist = whitelist
+        self._n_skipped_whitelist = 0
 
+        self._only_save_variant_nodes = only_save_variant_nodes
+        self._variant_nodes = set()
+        if self._only_save_variant_nodes:
+            logging.info("Will only store nodes associated to variants for each kmer")
+            # Find all variant nodes, store in a set
+            for node in range(len(graph.nodes)):
+                if node % 100000 == 0:
+                    logging.info("Adding variant nodes, on node %d" % node)
+                if len(graph.get_edges(node)) > 1:
+                    for next_node in graph.get_edges(node):
+                        self._variant_nodes.add(next_node)
+        else:
+            logging.info("Will save all nodes for each kmers")
 
         if self.pruning:
             logging.info("Will do pruning")
@@ -71,9 +87,18 @@ class SnpKmerFinder:
 
 
     def _add_kmer(self, kmer, nodes):
-        #logging.info("Adding kmer %s, %s" % (kmer, nodes))
+
+        if self._current_ref_offset == 1552511:
+            logging.info("Adding kmer %s, %s" % (kmer, nodes))
 
         hash = kmer_to_hash_fast(letter_sequence_to_numeric(kmer), k=len(kmer))
+
+        if self._whitelist is not None and hash not in self._whitelist:
+            self._n_skipped_whitelist += 1
+            return
+
+        if not self._has_traversed_variant and self._only_add_variant_kmers:
+            return
 
         if self._kmer_frequencies[hash] >= self._max_frequency:
             self._n_skipped_due_to_frequency += 1
@@ -102,6 +127,9 @@ class SnpKmerFinder:
         self._kmer_frequencies[hash] += 1
 
         for node in nodes:
+            if self._only_save_variant_nodes and node not in self._variant_nodes:
+                continue
+
             self._hashes.append(hash)
             self._nodes.append(node)
             self._ref_offsets.append(self._current_ref_offset)
@@ -176,6 +204,8 @@ class SnpKmerFinder:
 
         bases_so_far = len(self._bases_in_search_path)
         for next_node in next_nodes:
+            if self._current_ref_offset == 1552511:
+                logging.info("    Traversing next node %d. Bases left: %d" %  (next_node, bases_left))
             # After a search, reset the bases in search path back to where it was
             self._search_graph_from(next_node, 0, bases_left)
             #logging.info("Limiting at %d"  % bases_so_far)
@@ -194,6 +224,8 @@ class SnpKmerFinder:
                 logging.info("On ref position %d. %d kmers found. Have pruned %d kmers. "
                              "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d"
                              % (pos, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes))
+                if self._whitelist is not None:
+                    logging.info("N skipped because not in whitelist: %d" % self._n_skipped_whitelist)
             #if pos > 3000000:
             #break
             self._find_kmers_from_linear_ref_position(pos)

@@ -10,8 +10,13 @@ ext_modules=[
               libraries=["m"],
               extra_compile_args = ["-O3", "-ffast-math", "-march=native", "-fopenmp" ],
               extra_link_args=['-fopenmp']
-              )
-]
+              ),
+    Extension("graph_kmer_index.cython_reference_kmer_index",
+              ["graph_kmer_index/cython_reference_kmer_index.pyx"],
+              libraries=["m"],
+              extra_compile_args = ["-O3", "-ffast-math", "-march=native", "-fopenmp" ],
+              extra_link_args=['-fopenmp']
+              )]
 
 setup(name='graph_kmer_index',
       version='0.0.1',

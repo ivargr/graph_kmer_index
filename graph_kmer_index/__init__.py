@@ -6,4 +6,5 @@ from .reverse_kmer_index import ReverseKmerIndex
 from .collision_free_kmer_index import CollisionFreeKmerIndex
 from .collision_free_kmer_index import CollisionFreeKmerIndex as KmerIndex
 from .unique_kmer_index import UniqueKmerIndex
-from .reference_kmer_index import ReferenKmerIndex
+from .reference_kmer_index import ReferenceKmerIndex
+from .read_kmers import ReadKmers
