@@ -2,7 +2,9 @@ import sys
 import argparse
 import logging
 #from multiprocessing import shared_memory
+from multiprocessing import Pool, Process
 import numpy as np
+from itertools import repeat
 
 from .collision_free_kmer_index import CollisionFreeKmerIndex
 
@@ -15,13 +17,20 @@ from .flat_kmers import FlatKmers
 from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
 from .reference_kmer_index import ReferenceKmerIndex
+from pathos.multiprocessing import Pool
 
 
 def main():
     run_argument_parser(sys.argv[1:])
 
 
-def create_index(args):
+def create_index_single_thread(args, interval=None):
+    start_position = None
+    end_position = None
+    if interval is not None:
+        start_position = interval[0]
+        end_position = interval[1]
+
     logging.info("Loading data")
     graph = Graph.from_file(args.graph_file_name)
     logging.info("Running kmerfinder")
@@ -38,10 +47,47 @@ def create_index(args):
                            max_variant_nodes=args.max_variant_nodes,
                            only_add_variant_kmers=args.only_add_variant_kmers,
                            whitelist=whitelist,
-                           only_save_variant_nodes=args.only_save_variant_nodes)
+                           only_save_variant_nodes=args.only_save_variant_nodes,
+                           start_position=start_position,
+                           end_position=end_position)
     kmers = finder.find_kmers()
-    kmers.to_file(args.out_file_name)
-    #creator.to_file(args.out_file_name)
+    return kmers
+
+def create_index(args):
+    if args.threads == 1:
+        kmers = create_index_single_thread(args)
+        kmers.to_file(args.out_file_name)
+    else:
+        logging.info("Making pool with %d workers" % args.threads)
+        pool = Pool(args.threads)
+        genome_size = args.genome_size
+        n_total_start_positions = genome_size // args.spacing
+        n_positions_each_process = n_total_start_positions // args.threads
+        logging.info("Using genome size %d. Will process %d genome positions in each process." % (genome_size, n_positions_each_process))
+        intervals = []
+        for i in range(args.threads):
+            start_position = n_positions_each_process * i * args.spacing
+            end_position = n_positions_each_process * (i+1) * args.spacing
+            intervals.append((start_position, end_position))
+            logging.info("Creating interval for genome segment %d-%d" % (start_position, end_position))
+
+        all_hashes = []
+        all_nodes = []
+        all_ref_offsets = []
+        for flat_kmers in pool.starmap(create_index_single_thread, zip(repeat(args), intervals)):
+            all_hashes.append(flat_kmers._hashes)
+            all_nodes.append(flat_kmers._nodes)
+            all_ref_offsets.append(flat_kmers._ref_offsets)
+
+        logging.info("Making full index from all indexes")
+        full_index = FlatKmers(
+            np.concatenate(all_hashes),
+            np.concatenate(all_nodes),
+            np.concatenate(all_ref_offsets)
+        )
+
+        logging.info("Saving full index")
+        full_index.to_file(args.out_file_name)
 
 
 def make_from_flat(args):
@@ -132,6 +178,8 @@ def run_argument_parser(args):
     subparser.add_argument("-V", "--only-add-variant-kmers", required=False, type=bool, default=False)
     subparser.add_argument("-N", "--only-save-variant-nodes", required=False, type=bool, default=False)
     subparser.add_argument("-w", "--whitelist", required=False, help="Only add kmers in this whitelist (should be a flat kmers file)")
+    subparser.add_argument("-t", "--threads", required=False, default=1, type=int, help="How many threads to use. Some parameters will have local effect if t > 1 (-M)")
+    subparser.add_argument("-G", "--genome-size", required=False, default=3000000000, type=int, help="Must be set if --threads > 1 (used to make chunks to run in parallel)")
 
     subparser.set_defaults(func=create_index)
 

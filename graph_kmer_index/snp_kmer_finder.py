@@ -23,7 +23,8 @@ class SnpKmerFinder:
     """
 
     def __init__(self, graph, k=15, spacing=None, include_reverse_complements=False, pruning=False, max_kmers_same_position=100000,
-                 max_frequency=10000, max_variant_nodes=10000, only_add_variant_kmers=False, whitelist=None, only_save_variant_nodes=False):
+                 max_frequency=10000, max_variant_nodes=10000, only_add_variant_kmers=False, whitelist=None, only_save_variant_nodes=False,
+                 start_position=None, end_position=None):
         self.graph = graph
         self.k = k
         self.linear_nodes = graph.linear_ref_nodes()
@@ -51,6 +52,11 @@ class SnpKmerFinder:
         self._only_add_variant_kmers = only_add_variant_kmers
         self._whitelist = whitelist
         self._n_skipped_whitelist = 0
+        self._start_position = start_position
+        self._end_position = end_position
+
+        if self._start_position == None:
+            self._start_position = 0
 
         self._only_save_variant_nodes = only_save_variant_nodes
         self._variant_nodes = set()
@@ -218,7 +224,7 @@ class SnpKmerFinder:
 
 
     def find_kmers(self):
-        for i in range(0, self.graph.linear_ref_length() // self.spacing):
+        for i in range(self._start_position // self.spacing, self.graph.linear_ref_length() // self.spacing):
             pos = i * self.spacing
             if i % 10000 == 0:
                 logging.info("On ref position %d. %d kmers found. Have pruned %d kmers. "
@@ -226,8 +232,9 @@ class SnpKmerFinder:
                              % (pos, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes))
                 if self._whitelist is not None:
                     logging.info("N skipped because not in whitelist: %d" % self._n_skipped_whitelist)
-            #if pos > 3000000:
-            #break
+            if self._end_position is not None and pos >= self._end_position:
+                logging.info("Ending at end position %d" % self._end_position)
+                break
             self._find_kmers_from_linear_ref_position(pos)
 
         logging.info("Done finding all kmers")

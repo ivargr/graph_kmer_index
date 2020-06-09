@@ -39,7 +39,7 @@ cdef class CythonKmerIndex:
         self.modulo = index._modulo
 
     @cython.cdivision(True)
-    @cython.boundscheck(False)
+    #@cython.boundscheck(False)
     @cython.unraisable_tracebacks(True)
     cpdef np.ndarray[np.uint64_t, ndim=2] get(self, unsigned long[:] kmers):
         cdef int n = kmers.shape[0]

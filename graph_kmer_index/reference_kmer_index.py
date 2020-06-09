@@ -37,6 +37,8 @@ class ReferenceKmerIndex:
         ref_position_to_index = None
         if not only_store_kmers:
             ref_position_to_index = np.arange(0, len(genome_sequence), dtype=np.uint32)
+        else:
+            logging.info("Only storing kmers, not index")
 
         if k <= 16:
             kmers = kmers.astype(np.uint32)
@@ -55,7 +57,7 @@ class ReferenceKmerIndex:
         kmers = flat_kmers._hashes[sorting]
         nodes = flat_kmers._nodes[sorting]
 
-        assert len(kmers) > 4294967295, "Too many kmers to store (32 bit limit reached)"
+        assert len(kmers) < 4294967295, "Too many kmers to store (32 bit limit reached). There are %d kmers" % len(kmers)
 
         positions_of_new_ref_positions = np.where(np.ediff1d(ref_positions, to_begin=0))[0]
         ref_position_to_index = np.zeros(int(ref_positions[-1]) + 1, dtype=np.uint32)
