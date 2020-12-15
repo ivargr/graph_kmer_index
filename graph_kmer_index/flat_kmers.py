@@ -27,6 +27,24 @@ class FlatKmers:
         logging.info("Save dto %s.npz" % file_name)
 
 
+    @classmethod
+    def from_multiple_flat_kmers(cls, flat_kmers_list):
+        hashes = []
+        nodes = []
+        ref_offsets = []
+        for flat in flat_kmers_list:
+            hashes.extend(flat._hashes)
+            nodes.extend(flat._nodes)
+            if flat._ref_offsets is not None:
+                ref_offsets.extend(flat._ref_offsets)
+
+        if len(ref_offsets) == 0:
+            ref_offsets = None
+        else:
+            ref_offsets = np.array(ref_offsets, np.uint64)
+
+        return FlatKmers(np.array(hashes, dtype=np.uint64), np.array(nodes, np.uint32), ref_offsets)
+
 def letter_sequence_to_numeric(sequence):
     if not isinstance(sequence, np.ndarray):
         sequence = np.array(list(sequence.lower()), dtype="<U1")

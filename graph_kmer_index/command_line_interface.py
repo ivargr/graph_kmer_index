@@ -18,6 +18,8 @@ from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
 from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
+from alignment_free_graph_genotyper.analysis import GenotypeCalls
+from .unique_variant_kmers import UniqueVariantKmersFinder
 
 
 def main():
@@ -208,9 +210,23 @@ def run_argument_parser(args):
     subparser.add_argument("-k", "--kmer-size", required=False, type=int, default=16, help="Only needed if making from linear fasta")
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-O", "--only-store-kmers", required=False, default=False, type=bool, help="Can be used when making from fasta file, will then not store the index since an index is not needed")
-
     subparser.set_defaults(func=make_reference_kmer_index)
 
+    def make_unique_variant_kmers(args):
+        graph = Graph.from_file(args.graph)
+        reference_kmers = ReferenceKmerIndex.from_file(args.reference_kmers)
+        variants = GenotypeCalls.from_vcf(args.vcf)
+        finder = UniqueVariantKmersFinder(graph, reference_kmers, variants, args.kmer_size)
+        flat_kmers = finder.find_unique_kmers()
+        flat_kmers.to_file(args.out_file_name)
+
+    subparser = subparsers.add_parser("make_unique_variant_kmers", help="Make a reverse variant index lookup to unique kmers on that variant")
+    subparser.add_argument("-g", "--graph", required=True)
+    subparser.add_argument("-k", "--kmer-size", required=True, type=int)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.add_argument("-v", "--vcf", required=True)
+    subparser.add_argument("-r", "--reference-kmers", required=True)
+    subparser.set_defaults(func=make_unique_variant_kmers)
 
     subparser = subparsers.add_parser("prune_flat_kmers")
     subparser.add_argument("-f", "--flat-index", required=True)

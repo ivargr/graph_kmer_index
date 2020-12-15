@@ -30,6 +30,7 @@ cdef class CythonKmerIndex:
     cdef unsigned short[:] frequencies
 
     def __init__(self, index):
+        print("Init cython kmer index")
         self.hashes_to_index = index._hashes_to_index
         self.n_kmers = index._n_kmers
         self.nodes = index._nodes

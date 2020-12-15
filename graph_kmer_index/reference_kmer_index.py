@@ -21,17 +21,19 @@ class ReferenceKmerIndex:
 
     def get_between(self, ref_start, ref_end):
         return self.kmers[
-            self.ref_position_to_index[ref_start]:self.ref_position_to_index[ref_end]
+            self.ref_position_to_index[ref_start]:self.ref_position_to_index[min(len(self.ref_position_to_index)-1, ref_end)]
         ]
 
     def get_all_between(self, ref_start, ref_end):
+        if self.ref_positions is None:
+            raise Exception("This index is missing reference positions and cannot be used to get all between. "
+                            "Is it made from a linear reference? If so, use get_between() instead")
         start = self.ref_position_to_index[ref_start]
         end = self.ref_position_to_index[ref_end]
         return self.kmers[start:end], self.ref_positions[start:end], self.nodes[start:end]
 
     @classmethod
-    def from_linear_reference(cls, fasta_file_name, reference_name="ref", k=15, only_store_kmers=False):
-        genome_sequence = str(Fasta(fasta_file_name)[reference_name])
+    def from_sequence(cls, genome_sequence, k, only_store_kmers=False):
         kmers = ReadKmers.get_kmers_from_read_dynamic(genome_sequence, np.power(4, np.arange(0, k)))
 
         ref_position_to_index = None
@@ -48,6 +50,11 @@ class ReferenceKmerIndex:
             kmers = kmers.astype(np.uint64)
 
         return cls(ref_position_to_index, kmers)
+
+    @classmethod
+    def from_linear_reference(cls, fasta_file_name, reference_name="ref", k=15, only_store_kmers=False):
+        genome_sequence = str(Fasta(fasta_file_name)[reference_name])
+        return cls.from_sequence(genome_sequence, k, only_store_kmers)
 
     @classmethod
     def from_flat_kmers(cls, flat_kmers):
