@@ -48,9 +48,9 @@ class UniqueVariantKmersFinder:
                     #logging.info("  Found on linear ref elsewhere, %s" % kmer)
                     break
 
-                if hash in self._hashes_added:
-                    is_valid = False
-                    self._n_skipped_because_added_on_other_node += 1
+                #if hash in self._hashes_added:
+                #    is_valid = False
+                #    self._n_skipped_because_added_on_other_node += 1
 
             if not is_valid:
                 continue
@@ -73,10 +73,6 @@ class UniqueVariantKmersFinder:
                 if variant_node not in flat._nodes:
                     logging.warning("No variant node kmers found for variant %s" % variant)
 
-                if ref_node == 186893 or variant_node == 191295:
-                    logging.warning("DEBUG --------_")
-                    logging.info(finder.kmers_found)
-
                 self.flat_kmers_found.append(flat)
                 for hash in flat._hashes:
                     self._hashes_added.add(hash)
@@ -94,8 +90,8 @@ class UniqueVariantKmersFinder:
             if i % 1000 == 0:
                 logging.info("%d variants processed. Skipped because added on previous node: %d" % (i, self._n_skipped_because_added_on_other_node))
             #print("Finding unique kmers around variant %s" % variant)
-            if variant.type == "INSERTION":
-                continue
+            #if variant.type == "INSERTION":
+            #   continue
 
             ref_node, variant_node = self.graph.get_variant_nodes(variant)
 
@@ -103,12 +99,6 @@ class UniqueVariantKmersFinder:
 
             if len(self.flat_kmers_found) != n_processed + 1:
                 logging.warning("DID NOT FIND KMERS ON %s" % variant)
-                
-            if variant.position == 4999986:
-                logging.info("FOUND FLAT KMERS ON 4999986")
-                logging.info(self.flat_kmers_found[-1]._hashes)
-                logging.info(self.flat_kmers_found[-1]._nodes)
-                logging.info(self.flat_kmers_found[-1]._ref_offsets)
 
         logging.info("N variants with kmers found: %d" % len(self.flat_kmers_found))
         logging.info("Done with all variants. N that failed: %d" % self.n_failed_variants)

@@ -18,7 +18,7 @@ from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
 from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
-from alignment_free_graph_genotyper.analysis import GenotypeCalls
+from alignment_free_graph_genotyper.variants import GenotypeCalls
 from .unique_variant_kmers import UniqueVariantKmersFinder
 
 

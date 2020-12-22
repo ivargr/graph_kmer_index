@@ -53,6 +53,8 @@ class ReferenceKmerIndex:
 
     @classmethod
     def from_linear_reference(cls, fasta_file_name, reference_name="ref", k=15, only_store_kmers=False):
+        logging.info("Only store kmers? %s" % only_store_kmers)
+        logging.info("k=%d" % k)
         genome_sequence = str(Fasta(fasta_file_name)[reference_name])
         return cls.from_sequence(genome_sequence, k, only_store_kmers)
 

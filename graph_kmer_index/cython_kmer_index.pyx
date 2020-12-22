@@ -69,7 +69,7 @@ cdef class CythonKmerIndex:
                     continue
                 n_total_hits += 1
 
-        cdef np.ndarray[np.uint64_t, ndim=2] output_data = np.zeros((3, n_total_hits), dtype=np.uint64)
+        cdef np.ndarray[np.uint64_t, ndim=2] output_data = np.zeros((4, n_total_hits), dtype=np.uint64)
 
         if n_total_hits == 0:
             output_data
@@ -99,6 +99,7 @@ cdef class CythonKmerIndex:
                 output_data[0, counter] = self.nodes[index_position+j]
                 output_data[1, counter] = self.ref_offsets[index_position+j]
                 output_data[2, counter] = i
+                output_data[3, counter] = self.frequencies[index_position+j]
 
                 counter += 1
 
