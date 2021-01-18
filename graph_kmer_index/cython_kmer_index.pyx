@@ -25,6 +25,7 @@ cdef class CythonKmerIndex:
     cdef unsigned int[:] nodes
     cdef unsigned long[:] ref_offsets
     cdef unsigned long[:] kmers
+    cdef float[:] allele_frequencies
     cdef long modulo
     cdef unsigned long *hashes
     cdef unsigned short[:] frequencies
@@ -37,6 +38,7 @@ cdef class CythonKmerIndex:
         self.ref_offsets = index._ref_offsets
         self.kmers = index._kmers
         self.frequencies = index._frequencies
+        self.allele_frequencies = index._allele_frequencies
         self.modulo = index._modulo
 
     @cython.cdivision(True)
@@ -69,7 +71,7 @@ cdef class CythonKmerIndex:
                     continue
                 n_total_hits += 1
 
-        cdef np.ndarray[np.uint64_t, ndim=2] output_data = np.zeros((4, n_total_hits), dtype=np.uint64)
+        cdef np.ndarray[np.uint64_t, ndim=2] output_data = np.zeros((5, n_total_hits), dtype=np.uint64)
 
         if n_total_hits == 0:
             output_data
@@ -100,6 +102,7 @@ cdef class CythonKmerIndex:
                 output_data[1, counter] = self.ref_offsets[index_position+j]
                 output_data[2, counter] = i
                 output_data[3, counter] = self.frequencies[index_position+j]
+                output_data[4, counter] = (<np.uint64_t> (1000 * self.allele_frequencies[index_position+j]))
 
                 counter += 1
 

@@ -4,6 +4,7 @@ import logging
 import numpy as np
 
 def to_shared_memory(object, name):
+    logging.info("Writing to shared memory %s" % name)
     meta_information = {}
     for property_name in object.properties:
         data = object.__getattribute__(property_name)
@@ -16,7 +17,7 @@ def to_shared_memory(object, name):
         meta_information[property_name] = (data_type, data_shape)
 
         # Make shared memory and copy data to buffer
-        logging.info("Field %s has shape %s and type %s" % (property_name, data_shape, data_type))
+        #logging.info("Field %s has shape %s and type %s" % (property_name, data_shape, data_type))
         try:
             sa.delete(name + "_" + property_name)
             logging.info("Deleted already shared memory")
@@ -28,7 +29,8 @@ def to_shared_memory(object, name):
 
     f = open(name + "_meta.shm", "wb")
     pickle.dump(meta_information, f)
-    logging.info("Wrote meta data to file")
+    logging.info("Done writing to shared memory")
+    #logging.info("Wrote meta data to file")
 
 
 def from_shared_memory(cls, name):
@@ -37,14 +39,14 @@ def from_shared_memory(cls, name):
     for property_name, data in meta_data.items():
         data_type = data[0]
         data_shape = data[1]
-        logging.info("Found property %s with shape %s and type %s" % (property_name, data_shape, data_type))
+        #logging.info("Found property %s with shape %s and type %s" % (property_name, data_shape, data_type))
         data = sa.attach(name + "_" + property_name)
         # Single ints are wrapped in arrays
-        if len(data) == 1:
+        if len(data) == 1 and False:
             data = data[0]
-            logging.info("Extracted single int from %s" % property_name)
+            #logging.info("Extracted single int from %s" % property_name)
         setattr(object, property_name, data)
-        print("Data sample from class:: %s" % object.__getattribute__(property_name))
+        #print("Data sample from class:: %s" % object.__getattribute__(property_name))
 
     return object
 

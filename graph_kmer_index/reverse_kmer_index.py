@@ -31,7 +31,7 @@ class ReverseKmerIndex:
         index_position = int(self.nodes_to_index_positions[node])
         n_hashes = int(self.nodes_to_n_hashes[node])
         if n_hashes == 0:
-            return []
+            return [[], []]
 
         return self.hashes[index_position:index_position+n_hashes], self.ref_positions[index_position:index_position+n_hashes]
 

@@ -41,6 +41,11 @@ def create_index_single_thread(args, interval=None):
         w = FlatKmers.from_file(args.whitelist)
         whitelist = set(w._hashes)
 
+    skip_kmers_with_nodes = None
+    if args.skip_kmers_with_nodes is not None:
+        f = FlatKmers.from_file(args.skip_kmers_with_nodes)
+        skip_kmers_with_nodes = set(f._nodes)
+
     finder = SnpKmerFinder(graph, k=args.kmer_size, spacing=args.spacing,
                            include_reverse_complements=args.include_reverse_complement,
                            pruning=args.pruning,
@@ -51,7 +56,8 @@ def create_index_single_thread(args, interval=None):
                            whitelist=whitelist,
                            only_save_variant_nodes=args.only_save_variant_nodes,
                            start_position=start_position,
-                           end_position=end_position)
+                           end_position=end_position,
+                           skip_kmers_with_nodes=skip_kmers_with_nodes)
     kmers = finder.find_kmers()
     return kmers
 
@@ -76,16 +82,19 @@ def create_index(args):
         all_hashes = []
         all_nodes = []
         all_ref_offsets = []
+        all_allele_frequencies = []
         for flat_kmers in pool.starmap(create_index_single_thread, zip(repeat(args), intervals)):
             all_hashes.append(flat_kmers._hashes)
             all_nodes.append(flat_kmers._nodes)
             all_ref_offsets.append(flat_kmers._ref_offsets)
+            all_allele_frequencies.append(flat_kmers._allele_frequencies)
 
         logging.info("Making full index from all indexes")
         full_index = FlatKmers(
             np.concatenate(all_hashes),
             np.concatenate(all_nodes),
-            np.concatenate(all_ref_offsets)
+            np.concatenate(all_ref_offsets),
+            np.concatenate(all_allele_frequencies)
         )
 
         logging.info("Saving full index")
@@ -171,7 +180,7 @@ def run_argument_parser(args):
     subparser.add_argument("-g", "--graph_file_name", required=True)
     subparser.add_argument("-o", "--out_file_name", required=True)
     subparser.add_argument("-k", "--kmer_size", required=False, type=int, default=31)
-    subparser.add_argument("-r", "--include_reverse_complement", required=False, type=bool, default=False)
+    subparser.add_argument("-r", "--include-reverse-complement", required=False, type=bool, default=False)
     subparser.add_argument("-s", "--spacing", required=False, type=int, default=31)
     subparser.add_argument("-p", "--pruning", required=False, type=bool, default=False, help="Set to True to prune unecessary kmers")
     subparser.add_argument("-m", "--max-kmers-same-position", required=False, type=int, default=100000, help="Maximum number of kmers allowd to be added from the same ref position")
@@ -179,6 +188,7 @@ def run_argument_parser(args):
     subparser.add_argument("-v", "--max-variant-nodes", required=False, type=int, default=100000, help="Max variant nodes allowed in kmer.")
     subparser.add_argument("-V", "--only-add-variant-kmers", required=False, type=bool, default=False)
     subparser.add_argument("-N", "--only-save-variant-nodes", required=False, type=bool, default=False)
+    subparser.add_argument("-S", "--skip-kmers-with-nodes", required=False, help="Skip kmers with nodes that exist in this flat kmers file")
     subparser.add_argument("-w", "--whitelist", required=False, help="Only add kmers in this whitelist (should be a flat kmers file)")
     subparser.add_argument("-t", "--threads", required=False, default=1, type=int, help="How many threads to use. Some parameters will have local effect if t > 1 (-M)")
     subparser.add_argument("-G", "--genome-size", required=False, default=3000000000, type=int, help="Must be set if --threads > 1 (used to make chunks to run in parallel)")
@@ -214,7 +224,7 @@ def run_argument_parser(args):
 
     def make_unique_variant_kmers(args):
         graph = Graph.from_file(args.graph)
-        reference_kmers = ReferenceKmerIndex.from_file(args.reference_kmers)
+        reference_kmers = ReferenceKmerIndex.from_file(args.reference_kmers) if args.reference_kmers is not None else None
         variants = GenotypeCalls.from_vcf(args.vcf)
         finder = UniqueVariantKmersFinder(graph, reference_kmers, variants, args.kmer_size)
         flat_kmers = finder.find_unique_kmers()
@@ -225,13 +235,23 @@ def run_argument_parser(args):
     subparser.add_argument("-k", "--kmer-size", required=True, type=int)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-v", "--vcf", required=True)
-    subparser.add_argument("-r", "--reference-kmers", required=True)
+    subparser.add_argument("-r", "--reference-kmers", required=False)
     subparser.set_defaults(func=make_unique_variant_kmers)
 
     subparser = subparsers.add_parser("prune_flat_kmers")
     subparser.add_argument("-f", "--flat-index", required=True)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.set_defaults(func=prune_flat_kmers)
+
+    def merge_flat_kmers(args):
+        new = FlatKmers.from_multiple_flat_kmers([FlatKmers.from_file(f) for f in args.flat_kmers.split(",")])
+        new.to_file(args.out_file_name)
+        logging.info("Wrote merged index to %s" % new)
+
+    subparser = subparsers.add_parser("merge_flat_kmers")
+    subparser.add_argument("-f", "--flat-kmers", required="true", help="Comma-separeted list of file names to be merged")
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.set_defaults(func=merge_flat_kmers)
 
     if len(args) == 0:
         parser.print_help()

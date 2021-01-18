@@ -11,10 +11,11 @@ class CollisionFreeKmerIndex:
             "_ref_offsets",
             "_kmers",
             "_modulo",
-            "_frequencies"
+            "_frequencies",
+            "_allele_frequencies"
         }
 
-    def __init__(self, hashes_to_index=None, n_kmers=None, nodes=None, ref_offsets=None, kmers=None, modulo=452930477, frequencies=None):
+    def __init__(self, hashes_to_index=None, n_kmers=None, nodes=None, ref_offsets=None, kmers=None, modulo=452930477, frequencies=None, allele_frequencies=None):
         self._hashes_to_index = hashes_to_index
         self._n_kmers = n_kmers
         self._nodes = nodes
@@ -26,6 +27,8 @@ class CollisionFreeKmerIndex:
             self._frequencies = 0
         else:
             self._frequencies = frequencies
+
+        self._allele_frequencies = allele_frequencies
 
     def set_frequencies(self):
         logging.info("Setting frequencies")
@@ -58,18 +61,19 @@ class CollisionFreeKmerIndex:
         end = position + n_hits
         hit_positions = np.where(self._kmers[start:end] == kmer)[0]
         frequencies = self._frequencies[hit_positions+start]
+        allele_frequencies = self._allele_frequencies[hit_positions+start]
         if len(hit_positions) == 0 or frequencies[0] > max_hits:
-            return None, None, None
+            return None, None, None, None
 
-        return self._nodes[hit_positions + start], self._ref_offsets[hit_positions + start], frequencies
+        return self._nodes[hit_positions + start], self._ref_offsets[hit_positions + start], frequencies, allele_frequencies
 
-    def get_nodes_and_ref_offsets_from_multiple_kmers(self, kmers):
+    def get_nodes_and_ref_offsets_from_multiple_kmers(self, kmers, max_hits=10):
         all_nodes = []
         all_ref_offsets = []
         all_read_offsets = []
         all_frequencies = []
         for i, hash in enumerate(kmers):
-            nodes, ref_offsets, frequencies = self.get(hash)
+            nodes, ref_offsets, frequencies, allele_frequencies = self.get(hash, max_hits=max_hits)
             if nodes is None:
                 continue
             all_nodes.append(nodes)
@@ -87,6 +91,21 @@ class CollisionFreeKmerIndex:
         all_frequencies = np.concatenate(all_frequencies)
         return all_nodes, all_ref_offsets, all_read_offsets, all_frequencies
 
+    def get_nodes_from_multiple_kmers(self, kmers, max_hits=10):
+        all_nodes = []
+        for i, hash in enumerate(kmers):
+            nodes, ref_offsets, frequencies, allele_frequencies = self.get(hash, max_hits=max_hits)
+            if nodes is None:
+                continue
+            all_nodes.append(nodes)
+
+
+        if len(all_nodes) == 0:
+            return np.array([])
+
+        all_nodes = np.concatenate(all_nodes)
+        return all_nodes
+
     def to_file(self, file_name):
         logging.info("Writing kmer index to file: %s" % file_name)
         np.savez(file_name, hashes_to_index=self._hashes_to_index,
@@ -95,7 +114,8 @@ class CollisionFreeKmerIndex:
                  ref_offsets=self._ref_offsets,
                  kmers=self._kmers,
                  modulo=self._modulo,
-                 frequencies=self._frequencies)
+                 frequencies=self._frequencies,
+                 allele_frequencies=self._allele_frequencies)
 
     @classmethod
     def from_file(cls, file_name):
@@ -104,7 +124,7 @@ class CollisionFreeKmerIndex:
         except FileNotFoundError:
             data = np.load(file_name)
 
-        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"])
+        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"], data["allele_frequencies"])
 
     @classmethod
     def from_flat_kmers(cls, flat_kmers, modulo=452930477):
@@ -119,6 +139,7 @@ class CollisionFreeKmerIndex:
         kmers = kmers[sorting]
         nodes = nodes[sorting]
         ref_offsets = ref_offsets[sorting]
+        allele_frequencies = flat_kmers._allele_frequencies[sorting]
 
         # Find positions where hashes change (these are our index entries)
         diffs = np.ediff1d(hashes, to_begin=1)
@@ -132,7 +153,7 @@ class CollisionFreeKmerIndex:
         n_kmers[unique_hashes] = n_entries
 
         # Find out how many entries there are for each unique hash
-        object = cls(lookup, n_kmers, nodes, ref_offsets, kmers, modulo)
+        object = cls(lookup, n_kmers, nodes, ref_offsets, kmers, modulo, allele_frequencies=allele_frequencies)
         object.set_frequencies()
         return object
 

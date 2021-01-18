@@ -49,13 +49,14 @@ class SnpKmerFinder:
 
     def __init__(self, graph, k=15, spacing=None, include_reverse_complements=False, pruning=False, max_kmers_same_position=100000,
                  max_frequency=10000, max_variant_nodes=10000, only_add_variant_kmers=False, whitelist=None, only_save_variant_nodes=False,
-                 start_position=None, end_position=None, only_store_nodes=None):
+                 start_position=None, end_position=None, only_store_nodes=None, skip_kmers_with_nodes=None):
         self.graph = graph
         self.k = k
         self.linear_nodes = graph.linear_ref_nodes()
         self._hashes = []
         self._nodes = []
         self._ref_offsets = []
+        self._allele_frequencies = []
         self.kmers_found = []
         self._bases_in_search_path = []
         self._nodes_in_path = []
@@ -80,6 +81,8 @@ class SnpKmerFinder:
         self._start_position = start_position
         self._end_position = end_position
         self._only_store_nodes = only_store_nodes
+        self._skip_kmers_with_nodes = skip_kmers_with_nodes
+        self._n_skipped_blacklist_nodes = 0
 
         if self._start_position == None:
             self._start_position = 0
@@ -122,6 +125,10 @@ class SnpKmerFinder:
             self._n_skipped_whitelist += 1
             return
 
+        if self._skip_kmers_with_nodes is not None and len(set(nodes).intersection(self._skip_kmers_with_nodes)) > 0:
+            self._n_skipped_blacklist_nodes += 1
+            return
+
         if not self._has_traversed_variant and self._only_add_variant_kmers:
             return
 
@@ -151,6 +158,7 @@ class SnpKmerFinder:
         self._unique_kmers_added.add(hash)
         self._kmer_frequencies[hash] += 1
 
+        kmer_allele_frequency = min([self.graph.get_node_allele_frequency(node) for node in nodes])
         for node in nodes:
             if self._only_save_variant_nodes and node not in self._variant_nodes:
                 continue
@@ -161,11 +169,13 @@ class SnpKmerFinder:
             self._hashes.append(hash)
             self._nodes.append(node)
             self._ref_offsets.append(self._current_ref_offset)
+            self._allele_frequencies.append(kmer_allele_frequency)
 
             if self._include_reverse_complements:
                 self._hashes.append(rev_hash)
                 self._nodes.append(node)
                 self._ref_offsets.append(self._current_ref_offset)
+                self._allele_frequencies.append(kmer_allele_frequency)
 
         self._last_ref_pos_added = self._current_ref_offset
 
@@ -215,7 +225,7 @@ class SnpKmerFinder:
             self._bases_in_search_path.append("-")
             self._nodes_in_path.append(node)
 
-            if node == 188231:
+            if node == 188126:
                 logging.info("ON VARIANT NODE 188231")
                 logging.info(self._bases_in_search_path)
                 logging.info(self._nodes_in_path)
@@ -258,7 +268,7 @@ class SnpKmerFinder:
         self._find_all_variant_kmers_from_position(pos)
 
     def get_flat_kmers(self):
-        return FlatKmers(np.array(self._hashes, dtype=np.uint64), np.array(self._nodes, np.uint32), np.array(self._ref_offsets, np.uint64))
+        return FlatKmers(np.array(self._hashes, dtype=np.uint64), np.array(self._nodes, np.uint32), np.array(self._ref_offsets, np.uint64), np.array(self._allele_frequencies, np.single))
 
     def find_kmers(self):
         logging.info("Linear reference is %d bp" % self.graph.linear_ref_length())
@@ -266,8 +276,8 @@ class SnpKmerFinder:
             pos = i * self.spacing
             if i % 10000 == 0:
                 logging.info("On ref position %d. %d kmers found. Have pruned %d kmers. "
-                             "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d"
-                             % (pos, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes))
+                             "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d. Skipped because blacklisted node: %d"
+                             % (pos, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes, self._n_skipped_blacklist_nodes))
                 if self._whitelist is not None:
                     logging.info("N skipped because not in whitelist: %d" % self._n_skipped_whitelist)
             if self._end_position is not None and pos >= self._end_position:

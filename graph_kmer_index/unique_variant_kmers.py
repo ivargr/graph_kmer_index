@@ -1,6 +1,7 @@
 import logging
 from .snp_kmer_finder import SnpKmerFinder
 from .flat_kmers import FlatKmers
+from obgraph import VariantNotFoundException
 
 class UniqueVariantKmersFinder:
     def __init__(self, graph, reference_kmer_index, variants, k=31):
@@ -26,27 +27,33 @@ class UniqueVariantKmersFinder:
 
     def find_unique_kmers_over_variant(self, variant, ref_node, variant_node):
         is_valid = False
-        possible_ref_positions = [variant.position - i for i in range(1, self.k - 2)]
-        #logging.info("Will check ref positions %s" % possible_ref_positions)
+        has_added = False
+        # Start searching from before. The last position is probably the best for indels, since the sequence after is offset-ed. We want to end on this, because this is what is chosen if all else fails
+        possible_ref_positions = [variant.position - i for i in range(1, self.k - 2)][::-1]
+        if ref_node == 142822:
+            logging.info("Will check ref positions %s" % possible_ref_positions)
         for possible_ref_position in possible_ref_positions:
+
             is_valid = True
-            finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=3, only_store_nodes=set([ref_node, variant_node]))
+            finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=6, only_store_nodes=set([ref_node, variant_node]))
             finder.find_kmers_from_linear_ref_position(possible_ref_position)
 
 
             kmers_ref = set()
             kmers_variant = set()
-            #print("Checking ref position: %d. Found kmers: %s" % (possible_ref_position, finder.kmers_found))
+            if ref_node == 142822:
+                print("Checking ref position: %d. Found kmers: %s" % (possible_ref_position, finder.kmers_found))
             for kmer, nodes, ref_position, hash in finder.kmers_found:
                 if ref_node in nodes:
                     kmers_ref.add(kmer)
                 if variant_node in nodes:
                     kmers_variant.add(kmer)
 
-                if not self.kmer_is_unique_on_reference_position(hash, ref_position, max(0, ref_position - 150), ref_position + 150 - self.k):
-                    is_valid = False
-                    #logging.info("  Found on linear ref elsewhere, %s" % kmer)
-                    break
+                # not a requirement anymore
+                #if not self.kmer_is_unique_on_reference_position(hash, ref_position, max(0, ref_position - 150), ref_position + 150 - self.k):
+                #    is_valid = False
+                #    #logging.info("  Found on linear ref elsewhere, %s" % kmer)
+                #    break
 
                 #if hash in self._hashes_added:
                 #    is_valid = False
@@ -60,8 +67,13 @@ class UniqueVariantKmersFinder:
                 #logging.info("    Felles kmer mellom ref og variant: %s / %s" % (kmers_ref, kmers_variant))
                 is_valid = False
 
+            # if we are at last position (then choose this anyway, better than nothing)
+            if possible_ref_position == possible_ref_positions[-1]:
+                is_valid = True
+
             if is_valid:
-                #logging.info("   All kmers are valid, done with this variant")
+                if ref_node == 142822:
+                    logging.info("   All kmers are valid, done with this variant")
                 # Kmers are valid, we don't need to search anymore for this variant
                 flat = finder.get_flat_kmers()
                 if len(flat._nodes) == 0:
@@ -74,12 +86,15 @@ class UniqueVariantKmersFinder:
                     logging.warning("No variant node kmers found for variant %s" % variant)
 
                 self.flat_kmers_found.append(flat)
+                has_added = True
                 for hash in flat._hashes:
                     self._hashes_added.add(hash)
 
 
                 break
 
+        if not has_added:
+            logging.warning("Did not add any kmers for variant %s (nodes: %d/%d)" % (variant, ref_node, variant_node))
         if not is_valid:
             logging.warning("Traversed a variant %s, nodes %d/%d without finding unique kmers" % (variant, ref_node, variant_node))
             self.n_failed_variants += 1
@@ -93,7 +108,11 @@ class UniqueVariantKmersFinder:
             #if variant.type == "INSERTION":
             #   continue
 
-            ref_node, variant_node = self.graph.get_variant_nodes(variant)
+            try:
+                ref_node, variant_node = self.graph.get_variant_nodes(variant)
+            except VariantNotFoundException:
+                logging.warning("Variant %s not found" % variant)
+                continue
 
             self.find_unique_kmers_over_variant(variant, ref_node, variant_node)
 

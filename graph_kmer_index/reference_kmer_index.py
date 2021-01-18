@@ -24,6 +24,11 @@ class ReferenceKmerIndex:
             self.ref_position_to_index[ref_start]:self.ref_position_to_index[min(len(self.ref_position_to_index)-1, ref_end)]
         ]
 
+    def get_between_except(self, ref_start, ref_end, except_position):
+        assert self.ref_positions is None
+        indexes = [i for i in np.arange(ref_start, ref_end) if i != except_position]
+        return self.kmers[indexes]
+
     def get_all_between(self, ref_start, ref_end):
         if self.ref_positions is None:
             raise Exception("This index is missing reference positions and cannot be used to get all between. "
