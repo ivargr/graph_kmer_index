@@ -4,9 +4,9 @@ from .flat_kmers import FlatKmers
 from obgraph import VariantNotFoundException
 
 class UniqueVariantKmersFinder:
-    def __init__(self, graph, reference_kmer_index, variants, k=31):
+    def __init__(self, graph, variants, k=31):
         self.graph = graph
-        self.reference_kmer_index = reference_kmer_index
+        self.reference_kmer_index = None
         self.variants = variants
         self.k = k
         self.flat_kmers_found = []
@@ -41,8 +41,6 @@ class UniqueVariantKmersFinder:
 
             kmers_ref = set()
             kmers_variant = set()
-            if ref_node == 142822:
-                print("Checking ref position: %d. Found kmers: %s" % (possible_ref_position, finder.kmers_found))
             for kmer, nodes, ref_position, hash in finder.kmers_found:
                 if ref_node in nodes:
                     kmers_ref.add(kmer)

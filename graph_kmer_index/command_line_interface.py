@@ -166,7 +166,7 @@ def prune_flat_kmers(args):
         np.array(new_ref_offsets, dtype=index._ref_offsets.dtype),
     )
 
-    new.to_file(args.out_file_name)
+
 
 
 def run_argument_parser(args):
@@ -222,20 +222,34 @@ def run_argument_parser(args):
     subparser.add_argument("-O", "--only-store-kmers", required=False, default=False, type=bool, help="Can be used when making from fasta file, will then not store the index since an index is not needed")
     subparser.set_defaults(func=make_reference_kmer_index)
 
-    def make_unique_variant_kmers(args):
+    def make_unique_variant_kmers_single_thread(variants, args):
         graph = Graph.from_file(args.graph)
-        reference_kmers = ReferenceKmerIndex.from_file(args.reference_kmers) if args.reference_kmers is not None else None
-        variants = GenotypeCalls.from_vcf(args.vcf)
-        finder = UniqueVariantKmersFinder(graph, reference_kmers, variants, args.kmer_size)
+        logging.info("Reading all variants")
+        finder = UniqueVariantKmersFinder(graph, variants, args.kmer_size)
         flat_kmers = finder.find_unique_kmers()
-        flat_kmers.to_file(args.out_file_name)
+        return flat_kmers
+
+    def make_unique_variant_kmers(args):
+        logging.info("Reading all variants")
+        variants = GenotypeCalls.from_vcf(args.vcf, skip_index=True, make_generator=True)
+        variants = variants.get_chunks(chunk_size=10000)
+        pool = Pool(args.n_threads)
+
+        all_flat_kmers = []
+        for flat_kmers in pool.starmap(make_unique_variant_kmers_single_thread, zip(variants, repeat(args))):
+            all_flat_kmers.append(flat_kmers)
+
+        logging.info("Merge all flat kmers")
+        merged_flat = FlatKmers.from_multiple_flat_kmers(all_flat_kmers)
+        merged_flat.to_file(args.out_file_name)
+        logging.info("Wrote to file %s" % args.out_file_name)
 
     subparser = subparsers.add_parser("make_unique_variant_kmers", help="Make a reverse variant index lookup to unique kmers on that variant")
     subparser.add_argument("-g", "--graph", required=True)
     subparser.add_argument("-k", "--kmer-size", required=True, type=int)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-v", "--vcf", required=True)
-    subparser.add_argument("-r", "--reference-kmers", required=False)
+    subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
     subparser.set_defaults(func=make_unique_variant_kmers)
 
     subparser = subparsers.add_parser("prune_flat_kmers")
