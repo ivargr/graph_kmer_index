@@ -30,10 +30,15 @@ class CollisionFreeKmerIndex:
 
         self._allele_frequencies = allele_frequencies
 
-    def set_frequencies(self):
+    def set_frequencies(self, skip=False):
         logging.info("Setting frequencies")
         # Count number of each kmer (not hashes, store these)
         self._frequencies = np.zeros(len(self._kmers), dtype=np.uint16)
+
+        if skip:
+            logging.info("Skipped setting frequencies. All frequencies are just 0 by default.")
+            return
+
         unique = np.unique(self._kmers)
         for i, kmer in enumerate(unique):
             if i % 100000 == 0:
@@ -127,19 +132,22 @@ class CollisionFreeKmerIndex:
         return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"], data["allele_frequencies"])
 
     @classmethod
-    def from_flat_kmers(cls, flat_kmers, modulo=452930477):
+    def from_flat_kmers(cls, flat_kmers, modulo=452930477, skip_frequencies=False):
 
         kmers = flat_kmers._hashes
         nodes = flat_kmers._nodes
         ref_offsets = flat_kmers._ref_offsets
 
+        logging.info("Making hashes")
         hashes = kmers % modulo
+        logging.info("Sorting")
         sorting = np.argsort(hashes)
         hashes = hashes[sorting]
         kmers = kmers[sorting]
         nodes = nodes[sorting]
         ref_offsets = ref_offsets[sorting]
         allele_frequencies = flat_kmers._allele_frequencies[sorting]
+        logging.info("Done sorting")
 
         # Find positions where hashes change (these are our index entries)
         diffs = np.ediff1d(hashes, to_begin=1)
@@ -154,7 +162,7 @@ class CollisionFreeKmerIndex:
 
         # Find out how many entries there are for each unique hash
         object = cls(lookup, n_kmers, nodes, ref_offsets, kmers, modulo, allele_frequencies=allele_frequencies)
-        object.set_frequencies()
+        object.set_frequencies(skip_frequencies)
         return object
 
 

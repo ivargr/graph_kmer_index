@@ -103,7 +103,7 @@ def create_index(args):
 
 def make_from_flat(args):
     flat = FlatKmers.from_file(args.flat_index)
-    index = CollisionFreeKmerIndex.from_flat_kmers(flat, modulo=args.hash_modulo)
+    index = CollisionFreeKmerIndex.from_flat_kmers(flat, modulo=args.hash_modulo, skip_frequencies=args.skip_frequencies)
     index.to_file(args.out_file_name)
     logging.info("Done making kmer index")
 
@@ -199,6 +199,7 @@ def run_argument_parser(args):
     subparser.add_argument("-o", "--out_file_name", required=True)
     subparser.add_argument("-f", "--flat-index", required=True)
     subparser.add_argument("-m", "--hash_modulo", required=False, type=int, default=452930477)
+    subparser.add_argument("-S", "--skip-frequencies", type=bool, default=False, required=False)
     subparser.set_defaults(func=make_from_flat)
 
     subparser = subparsers.add_parser("make_reverse")

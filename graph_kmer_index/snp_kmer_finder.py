@@ -274,10 +274,10 @@ class SnpKmerFinder:
         logging.info("Linear reference is %d bp" % self.graph.linear_ref_length())
         for i in range(self._start_position // self.spacing, self.graph.linear_ref_length() // self.spacing):
             pos = i * self.spacing
-            if i % 10000 == 0:
-                logging.info("On ref position %d. %d kmers found. Have pruned %d kmers. "
+            if i % 50000 == 0:
+                logging.info("On ref position %d/%s. %d kmers found. Have pruned %d kmers. "
                              "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d. Skipped because blacklisted node: %d"
-                             % (pos, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes, self._n_skipped_blacklist_nodes))
+                             % (pos, self._end_position, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes, self._n_skipped_blacklist_nodes))
                 if self._whitelist is not None:
                     logging.info("N skipped because not in whitelist: %d" % self._n_skipped_whitelist)
             if self._end_position is not None and pos >= self._end_position:

@@ -60,8 +60,8 @@ class ReverseKmerIndex:
         max_node = np.max(nodes)
         logging.info("Max node: %d" % max_node)
 
-        nodes_index = np.zeros(max_node+1)
-        n_kmers = np.zeros(max_node+1)
+        nodes_index = np.zeros(max_node+1, dtype=np.uint32)
+        n_kmers = np.zeros(max_node+1, dtype=np.uint16)
         sorted_nodes = np.argsort(nodes)
         nodes = nodes[sorted_nodes]
         kmers = kmers[sorted_nodes]
