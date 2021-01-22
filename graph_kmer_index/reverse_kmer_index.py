@@ -3,7 +3,8 @@ import numpy as np
 
 
 class ReverseKmerIndex:
-    def __init__(self, nodes_to_index_positions, nodes_to_n_hashes, hashes, ref_positions):
+    properties = {"nodes_to_index_positions", "nodes_to_n_hashes", "hashes", "ref_positions"}
+    def __init__(self, nodes_to_index_positions=None, nodes_to_n_hashes=None, hashes=None, ref_positions=None):
         self.nodes_to_index_positions = nodes_to_index_positions
         self.nodes_to_n_hashes = nodes_to_n_hashes
         self.hashes = hashes

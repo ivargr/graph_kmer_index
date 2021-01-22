@@ -13,7 +13,8 @@ def fill_zeros_from_end(array):
 
 
 class ReferenceKmerIndex:
-    def __init__(self, ref_position_to_index, kmers, ref_positions=None, nodes=None):
+    properties = {"ref_position_to_index", "kmers", "ref_positions", "nodes"}
+    def __init__(self, ref_position_to_index=None, kmers=None, ref_positions=None, nodes=None):
         self.ref_position_to_index = ref_position_to_index
         self.kmers = kmers
         self.ref_positions = ref_positions

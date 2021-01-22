@@ -42,9 +42,9 @@ def from_shared_memory(cls, name):
         #logging.info("Found property %s with shape %s and type %s" % (property_name, data_shape, data_type))
         data = sa.attach(name + "_" + property_name)
         # Single ints are wrapped in arrays
-        if len(data) == 1 and False:
+        if len(data) == 1 and property_name == "_modulo":
             data = data[0]
-            #logging.info("Extracted single int from %s" % property_name)
+            logging.info("Extracted single int from %s" % property_name)
         setattr(object, property_name, data)
         #print("Data sample from class:: %s" % object.__getattribute__(property_name))
 
