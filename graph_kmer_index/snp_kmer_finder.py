@@ -1,4 +1,6 @@
 import logging
+import time
+
 logging.basicConfig(level=logging.INFO)
 import numpy as np
 from offsetbasedgraph import Graph, Interval, Block, SequenceGraph
@@ -49,10 +51,13 @@ class SnpKmerFinder:
 
     def __init__(self, graph, k=15, spacing=None, include_reverse_complements=False, pruning=False, max_kmers_same_position=100000,
                  max_frequency=10000, max_variant_nodes=10000, only_add_variant_kmers=False, whitelist=None, only_save_variant_nodes=False,
-                 start_position=None, end_position=None, only_store_nodes=None, skip_kmers_with_nodes=None):
+                 start_position=None, end_position=None, only_store_nodes=None, skip_kmers_with_nodes=None, only_save_one_node_per_kmer=False):
         self.graph = graph
         self.k = k
-        self.linear_nodes = graph.linear_ref_nodes()
+        #logging.info("Getting linear ref nodes")
+        #self.linear_nodes = graph.linear_ref_nodes()
+
+
         self._hashes = []
         self._nodes = []
         self._ref_offsets = []
@@ -83,6 +88,7 @@ class SnpKmerFinder:
         self._only_store_nodes = only_store_nodes
         self._skip_kmers_with_nodes = skip_kmers_with_nodes
         self._n_skipped_blacklist_nodes = 0
+        self._only_save_one_node_per_kmer = only_save_one_node_per_kmer
 
         if self._start_position == None:
             self._start_position = 0
@@ -109,6 +115,12 @@ class SnpKmerFinder:
 
 
     def has_kmer(self, kmer, nodes):
+        for found in self.kmers_found:
+            if found[0] == kmer and found[1] == nodes:
+                return True
+        return False
+
+
         if (kmer, nodes) in self.kmers_found:
             return True
         return False
@@ -116,7 +128,8 @@ class SnpKmerFinder:
 
     def _add_kmer(self, kmer, nodes):
         #logging.info("      Addign kmer %s with nodes %s" % (kmer, nodes))
-        
+        self._n_paths_searched += 1
+
         assert len(kmer) == self.k
 
         hash = kmer_to_hash_fast(letter_sequence_to_numeric(kmer), k=len(kmer))
@@ -147,7 +160,7 @@ class SnpKmerFinder:
             self._n_kmers_skipped += 1
             return
 
-        n_variant_nodes = len([n for n in nodes if n not in self.linear_nodes])
+        n_variant_nodes = len([n for n in nodes if not self.graph.is_linear_ref_node(n)])
         if n_variant_nodes >= self._max_variant_nodes:
             self._n_skipped_due_to_max_variant_nodes += 1
             return
@@ -177,6 +190,9 @@ class SnpKmerFinder:
                 self._ref_offsets.append(self._current_ref_offset)
                 self._allele_frequencies.append(kmer_allele_frequency)
 
+            if self._only_save_one_node_per_kmer:
+                break
+
         self._last_ref_pos_added = self._current_ref_offset
 
         self._kmers_found += 1
@@ -187,6 +203,7 @@ class SnpKmerFinder:
         self._n_kmers_added_current_position += 1
 
     def _find_all_variant_kmers_from_position(self, linear_ref_pos):
+        self._n_paths_searched = 0
         self._current_ref_offset = linear_ref_pos
 
         # Always start one base pair before, but do not include that base pair
@@ -210,6 +227,9 @@ class SnpKmerFinder:
     def _search_graph_from(self, node, offset, bases_left):
         #logging.info("== Searching node %d from offset %d. Bases left: %d == " % (node, offset, bases_left))
 
+        if self._n_paths_searched > 1000 and False:
+            logging.warning("More than 1000 paths searched from ref pos %d. Possibly many variants here?" % self._current_ref_offset)
+
         if bases_left == 0:
             self._add_kmer(''.join(self._bases_in_search_path).replace("-", ""), set(self._nodes_in_path))
             #logging.info("Recursion is done")
@@ -217,7 +237,9 @@ class SnpKmerFinder:
 
         # Process the rest of this node
         node_size = int(self.graph.nodes[node])
-        node_sequence = self.graph.get_node_sequence(node)
+        #node_sequence = self.graph.get_node_sequence(node)
+        node_sequence = self.graph.get_node_subsequence(node, offset, min(offset + bases_left, node_size))
+        #logging.info("Got node sequence for node %d, from offset %d to %d: %s" % (node, offset, min(offset + bases_left, node_size), node_sequence))
 
         # Special case for empty node (without sequence, we always want to add this
         if node_size == 0:
@@ -231,7 +253,7 @@ class SnpKmerFinder:
                 logging.info(self._nodes_in_path)
 
         for node_position in range(int(offset), node_size):
-            base = node_sequence[node_position]
+            base = node_sequence[node_position-int(offset)]  # subtract offset since node sequence now starts at offset
             #logging.info("   Adding base %s at node %d, pos %d" % (base, node, node_position))
             self._bases_in_search_path.append(base)
             self._nodes_in_path.append(node)
@@ -250,8 +272,14 @@ class SnpKmerFinder:
             self._has_traversed_variant = True
 
         # Prioritize linear ref node
-        if len(next_nodes) > 0 and next_nodes[0] not in self.linear_nodes:
+        if len(next_nodes) > 0 and not self.graph.is_linear_ref_node(next_nodes[0]):
             next_nodes = list(reversed(next_nodes))
+
+        #logging.info("NExt nodes: %s" % next_nodes)
+        # If we have traversed too many variant nodes, only go for one next node
+        #n_variant_nodes = len([n for n in self._nodes_in_path if not self.graph.is_linear_ref_node(n)])
+        #if n_variant_nodes >= self._max_variant_nodes:
+        #    next_nodes = next_nodes[0:1]
 
         bases_so_far = len(self._bases_in_search_path)
         for next_node in next_nodes:
@@ -272,18 +300,26 @@ class SnpKmerFinder:
 
     def find_kmers(self):
         logging.info("Linear reference is %d bp" % self.graph.linear_ref_length())
+        if self._end_position is None:
+            self._end_position = self.graph.linear_ref_length()
+
+
+        prev_time = time.time()
         for i in range(self._start_position // self.spacing, self.graph.linear_ref_length() // self.spacing):
             pos = i * self.spacing
-            if i % 50000 == 0:
-                logging.info("On ref position %d/%s. %d kmers found. Have pruned %d kmers. "
+            if i % 100000 == 0:
+
+                logging.info("On ref position %d/%s. Time spent: %.3f. %d/%d basepairs traversed. %d kmers found. Have pruned %d kmers. "
                              "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d. Skipped because blacklisted node: %d"
-                             % (pos, self._end_position, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes, self._n_skipped_blacklist_nodes))
+                             % (pos, self._end_position, time.time() - prev_time, (i - self._start_position//self.spacing) * self.spacing, self._end_position-self._start_position, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes, self._n_skipped_blacklist_nodes))
+                prev_time = time.time()
                 if self._whitelist is not None:
                     logging.info("N skipped because not in whitelist: %d" % self._n_skipped_whitelist)
             if self._end_position is not None and pos >= self._end_position:
                 logging.info("Ending at end position %d" % self._end_position)
                 break
             self.find_kmers_from_linear_ref_position(pos)
+
 
         logging.info("Done finding all kmers")
         return self.get_flat_kmers()

@@ -20,6 +20,7 @@ from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
 from alignment_free_graph_genotyper.variants import GenotypeCalls
 from .unique_variant_kmers import UniqueVariantKmersFinder
+from graph_kmer_index.shared_mem import to_shared_memory, from_shared_memory
 
 
 def main():
@@ -34,7 +35,8 @@ def create_index_single_thread(args, interval=None):
         end_position = interval[1]
 
     logging.info("Loading data")
-    graph = Graph.from_file(args.graph_file_name)
+    #graph = Graph.from_file(args.graph_file_name)
+    graph = from_shared_memory(Graph, "graph_shared")
     logging.info("Running kmerfinder")
     whitelist = None
     if args.whitelist is not None:
@@ -57,11 +59,15 @@ def create_index_single_thread(args, interval=None):
                            only_save_variant_nodes=args.only_save_variant_nodes,
                            start_position=start_position,
                            end_position=end_position,
-                           skip_kmers_with_nodes=skip_kmers_with_nodes)
+                           skip_kmers_with_nodes=skip_kmers_with_nodes,
+                           only_save_one_node_per_kmer=args.only_save_one_node_per_kmer)
+
     kmers = finder.find_kmers()
     return kmers
 
 def create_index(args):
+    graph = Graph.from_file(args.graph_file_name)
+    to_shared_memory(graph, "graph_shared")
     if args.threads == 1:
         kmers = create_index_single_thread(args)
         kmers.to_file(args.out_file_name)
@@ -188,6 +194,7 @@ def run_argument_parser(args):
     subparser.add_argument("-v", "--max-variant-nodes", required=False, type=int, default=100000, help="Max variant nodes allowed in kmer.")
     subparser.add_argument("-V", "--only-add-variant-kmers", required=False, type=bool, default=False)
     subparser.add_argument("-N", "--only-save-variant-nodes", required=False, type=bool, default=False)
+    subparser.add_argument("-O", "--only-save-one-node-per-kmer", required=False, type=bool, default=False)
     subparser.add_argument("-S", "--skip-kmers-with-nodes", required=False, help="Skip kmers with nodes that exist in this flat kmers file")
     subparser.add_argument("-w", "--whitelist", required=False, help="Only add kmers in this whitelist (should be a flat kmers file)")
     subparser.add_argument("-t", "--threads", required=False, default=1, type=int, help="How many threads to use. Some parameters will have local effect if t > 1 (-M)")
@@ -224,16 +231,19 @@ def run_argument_parser(args):
     subparser.set_defaults(func=make_reference_kmer_index)
 
     def make_unique_variant_kmers_single_thread(variants, args):
-        graph = Graph.from_file(args.graph)
+        graph = from_shared_memory(Graph, "graph_variant_index_shared")
+        #graph = Graph.from_file(args.graph)
         logging.info("Reading all variants")
         finder = UniqueVariantKmersFinder(graph, variants, args.kmer_size)
         flat_kmers = finder.find_unique_kmers()
         return flat_kmers
 
     def make_unique_variant_kmers(args):
+        graph = Graph.from_file(args.graph)
+        to_shared_memory(graph, "graph_variant_index_shared")
         logging.info("Reading all variants")
         variants = GenotypeCalls.from_vcf(args.vcf, skip_index=True, make_generator=True)
-        variants = variants.get_chunks(chunk_size=10000)
+        variants = variants.get_chunks(chunk_size=args.chunk_size)
         pool = Pool(args.n_threads)
 
         all_flat_kmers = []
@@ -251,6 +261,7 @@ def run_argument_parser(args):
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-v", "--vcf", required=True)
     subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
+    subparser.add_argument("-c", "--chunk-size", required=False, default=10000, type=int, help="Number of variants given to each thread")
     subparser.set_defaults(func=make_unique_variant_kmers)
 
     subparser = subparsers.add_parser("prune_flat_kmers")

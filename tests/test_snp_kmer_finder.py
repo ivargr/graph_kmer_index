@@ -66,5 +66,5 @@ def test_indel_graph2():
     flat_kmers = kmer_finder.find_kmers()
     print(kmer_finder.kmers_found)
 
-test_indel_graph2()
-#test_simple_snp_graph()
+#test_indel_graph2()
+test_simple_snp_graph()

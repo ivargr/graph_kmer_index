@@ -1,4 +1,6 @@
 import logging
+import time
+
 from .snp_kmer_finder import SnpKmerFinder
 from .flat_kmers import FlatKmers
 from obgraph import VariantNotFoundException
@@ -31,7 +33,7 @@ class UniqueVariantKmersFinder:
         # Start searching from before. The last position is probably the best for indels, since the sequence after is offset-ed. We want to end on this, because this is what is chosen if all else fails
         possible_ref_positions = [variant.position - i for i in range(1, self.k - 2)][::-1]
         for possible_ref_position in possible_ref_positions:
-
+            possible_ref_position = self.graph.convert_chromosome_ref_offset_to_graph_ref_offset(possible_ref_position, variant.chromosome)
             is_valid = True
             finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=6, only_store_nodes=set([ref_node, variant_node]))
             finder.find_kmers_from_linear_ref_position(possible_ref_position)
@@ -71,7 +73,7 @@ class UniqueVariantKmersFinder:
                 # Kmers are valid, we don't need to search anymore for this variant
                 flat = finder.get_flat_kmers()
                 if len(flat._nodes) == 0:
-                    logging.warning("Found 0 nodes for variant %s. Hashes: %s, ref positions: %s" % (variant, flat._hashes, flat._ref_offsets))
+                    logging.warning("Found 0 nodes for variant %s. Hashes: %s, ref positions: %s. Searched from ref position %d" % (variant, flat._hashes, flat._ref_offsets, possible_ref_position))
 
                 if ref_node not in flat._nodes:
                     logging.warning("Found kmers for variant %s with ref/variant nodes %d/%d but flat kmers does not contain ref node. Flat kmer nodes: %s" % (variant, ref_node, variant_node, flat._nodes))
@@ -87,17 +89,20 @@ class UniqueVariantKmersFinder:
 
                 break
 
-        if not has_added:
+        if not has_added and False:
             logging.warning("Did not add any kmers for variant %s (nodes: %d/%d)" % (variant, ref_node, variant_node))
-        if not is_valid:
-            logging.warning("Traversed a variant %s, nodes %d/%d without finding unique kmers" % (variant, ref_node, variant_node))
+            self.n_failed_variants += 1
+        if not is_valid or not has_added:
+            #logging.warning("Traversed a variant %s, nodes %d/%d without finding unique kmers" % (variant, ref_node, variant_node))
             self.n_failed_variants += 1
 
     def find_unique_kmers(self):
+        prev_time = time.time()
         for i, variant in enumerate(self.variants):
             n_processed = len(self.flat_kmers_found)
-            if i % 10000 == 0:
-                logging.info("%d variants processed. Now on ref pos %d" % (i, variant.position))
+            if i % 50000 == 0:
+                logging.info("%d/%d variants processed (time spent on previous 10k: %.3f s). Now on chromosome/ref pos %d/%d" % (i, len(self.variants), time.time()-prev_time, variant.chromosome, variant.position))
+                prev_time = time.time()
 
             try:
                 ref_node, variant_node = self.graph.get_variant_nodes(variant)
@@ -107,8 +112,8 @@ class UniqueVariantKmersFinder:
 
             self.find_unique_kmers_over_variant(variant, ref_node, variant_node)
 
-            if len(self.flat_kmers_found) != n_processed + 1:
-                logging.warning("DID NOT FIND KMERS ON %s" % variant)
+            #if len(self.flat_kmers_found) != n_processed + 1:
+            #    logging.warning("DID NOT FIND KMERS ON %s" % variant)
 
         logging.info("N variants with kmers found: %d" % len(self.flat_kmers_found))
         logging.info("Done with all variants. N that failed: %d" % self.n_failed_variants)
