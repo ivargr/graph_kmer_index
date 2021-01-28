@@ -160,7 +160,7 @@ class SnpKmerFinder:
             self._n_kmers_skipped += 1
             return
 
-        n_variant_nodes = len([n for n in nodes if not self.graph.is_linear_ref_node(n)])
+        n_variant_nodes = len([n for n in nodes if not self.graph.is_linear_ref_node_or_linear_ref_dummy_node(n)])
         if n_variant_nodes >= self._max_variant_nodes:
             self._n_skipped_due_to_max_variant_nodes += 1
             return
@@ -272,7 +272,7 @@ class SnpKmerFinder:
             self._has_traversed_variant = True
 
         # Prioritize linear ref node
-        if len(next_nodes) > 0 and not self.graph.is_linear_ref_node(next_nodes[0]):
+        if len(next_nodes) > 0 and not self.graph.is_linear_ref_node_or_linear_ref_dummy_node(next_nodes[0]):
             next_nodes = list(reversed(next_nodes))
 
         #logging.info("NExt nodes: %s" % next_nodes)

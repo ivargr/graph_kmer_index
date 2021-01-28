@@ -234,7 +234,7 @@ def run_argument_parser(args):
         graph = from_shared_memory(Graph, "graph_variant_index_shared")
         #graph = Graph.from_file(args.graph)
         logging.info("Reading all variants")
-        finder = UniqueVariantKmersFinder(graph, variants, args.kmer_size)
+        finder = UniqueVariantKmersFinder(graph, variants, args.kmer_size, args.max_variant_nodes)
         flat_kmers = finder.find_unique_kmers()
         return flat_kmers
 
@@ -262,6 +262,7 @@ def run_argument_parser(args):
     subparser.add_argument("-v", "--vcf", required=True)
     subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
     subparser.add_argument("-c", "--chunk-size", required=False, default=10000, type=int, help="Number of variants given to each thread")
+    subparser.add_argument("-m", "--max-variant-nodes", required=False, default=6, type=int, help="Maximum number of variant nodes allowed in kmer")
     subparser.set_defaults(func=make_unique_variant_kmers)
 
     subparser = subparsers.add_parser("prune_flat_kmers")

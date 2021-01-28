@@ -36,6 +36,7 @@ class FlatKmers:
 
     @classmethod
     def from_multiple_flat_kmers(cls, flat_kmers_list):
+        logging.info("Making flat kmers")
         hashes = []
         nodes = []
         ref_offsets = []
@@ -53,6 +54,7 @@ class FlatKmers:
         else:
             ref_offsets = np.array(ref_offsets, np.uint64)
 
+        logging.info("Done making flat kmers")
         return FlatKmers(np.array(hashes, dtype=np.uint64), np.array(nodes, np.uint32), ref_offsets, np.array(allele_frequencies, dtype=np.uint16))
 
 

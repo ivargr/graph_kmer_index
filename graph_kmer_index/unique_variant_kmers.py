@@ -6,7 +6,7 @@ from .flat_kmers import FlatKmers
 from obgraph import VariantNotFoundException
 
 class UniqueVariantKmersFinder:
-    def __init__(self, graph, variants, k=31):
+    def __init__(self, graph, variants, k=31, max_variant_nodes=6):
         self.graph = graph
         self.reference_kmer_index = None
         self.variants = variants
@@ -15,6 +15,7 @@ class UniqueVariantKmersFinder:
         self.n_failed_variants = 0
         self._n_skipped_because_added_on_other_node = 0
         self._hashes_added = set()
+        self._max_variant_nodes = max_variant_nodes
 
     def kmer_is_unique_on_reference_position(self, kmer, reference_position, ref_start, ref_end):
         # returns true if kmer is unique when ignoring kmers on same ref pos
@@ -35,7 +36,7 @@ class UniqueVariantKmersFinder:
         for possible_ref_position in possible_ref_positions:
             possible_ref_position = self.graph.convert_chromosome_ref_offset_to_graph_ref_offset(possible_ref_position, variant.chromosome)
             is_valid = True
-            finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=6, only_store_nodes=set([ref_node, variant_node]))
+            finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=self._max_variant_nodes, only_store_nodes=set([ref_node, variant_node]))
             finder.find_kmers_from_linear_ref_position(possible_ref_position)
 
 
@@ -43,9 +44,9 @@ class UniqueVariantKmersFinder:
             kmers_variant = set()
             for kmer, nodes, ref_position, hash in finder.kmers_found:
                 if ref_node in nodes:
-                    kmers_ref.add(kmer)
+                    kmers_ref.add(kmer.lower())
                 if variant_node in nodes:
-                    kmers_variant.add(kmer)
+                    kmers_variant.add(kmer.lower())
 
                 # not a requirement anymore
                 #if not self.kmer_is_unique_on_reference_position(hash, ref_position, max(0, ref_position - 150), ref_position + 150 - self.k):
