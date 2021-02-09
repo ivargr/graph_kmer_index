@@ -1,4 +1,4 @@
-from .flat_kmers import letter_sequence_to_numeric
+from .flat_kmers import letter_sequence_to_numeric, numeric_to_letter_sequence
 from .snp_kmer_finder import kmer_to_hash_fast, sequence_to_kmer_hash, kmer_hash_to_sequence
 from .snp_kmer_finder import SnpKmerFinder
 from .flat_kmers import FlatKmers

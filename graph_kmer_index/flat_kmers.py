@@ -71,4 +71,16 @@ def letter_sequence_to_numeric(sequence):
     numeric[np.where(sequence == "m")[0]] = 0
     return numeric
 
+def numeric_to_letter_sequence(sequence):
+
+    numeric = np.zeros_like(sequence, dtype=object)
+    numeric[np.where(sequence == 0)[0]] = "a"
+    numeric[np.where(sequence == 1)[0]] = "c"
+    numeric[np.where(sequence == 2)[0]] = "t"
+    numeric[np.where(sequence == 3)[0]] = "g"
+    return numeric
+
+
+
+
 
