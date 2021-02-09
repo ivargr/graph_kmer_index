@@ -3,11 +3,20 @@ import SharedArray as sa
 import logging
 import numpy as np
 
+class SingleSharedArray:
+    properties = {"array"}
+    def __init__(self, array=None):
+        self.array = array
+
 def to_shared_memory(object, name):
     logging.info("Writing to shared memory %s" % name)
     meta_information = {}
     for property_name in object.properties:
         data = object.__getattribute__(property_name)
+
+        if data is None:
+            data = np.zeros(0)
+
         # Wrap single ints in arrays
         if data.shape == ():
             data = np.array([data], dtype=data.dtype)
@@ -51,3 +60,7 @@ def from_shared_memory(cls, name):
     return object
 
 
+def remove_shared_memory():
+    for shared in sa.list():
+        logging.info("Deleting %s" % shared.name.decode("utf-8"))
+        sa.delete(shared.name.decode("utf-8"))
