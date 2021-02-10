@@ -3,7 +3,6 @@ import time
 
 logging.basicConfig(level=logging.INFO)
 import numpy as np
-from offsetbasedgraph import Graph, Interval, Block, SequenceGraph
 from .flat_kmers import FlatKmers, letter_sequence_to_numeric
 from numba import jit
 from Bio.Seq import Seq
@@ -324,29 +323,6 @@ class SnpKmerFinder:
         logging.info("Done finding all kmers")
         return self.get_flat_kmers()
 
-
-
-def test_simple():
-
-    graph = Graph({1: Block(10), 2: Block(1), 3: Block(1), 4: Block(10)}, {1: [2, 3], 2: [4], 3: [4]})
-    graph.convert_to_numpy_backend()
-
-    sequence_graph = SequenceGraph.create_empty_from_ob_graph(graph)
-    sequence_graph.set_sequence(1, "GGGTTTATAC")
-    sequence_graph.set_sequence(2, "A")
-    sequence_graph.set_sequence(3, "C")
-    sequence_graph.set_sequence(4, "GTACATTGTA")
-
-    linear_ref = Interval(0, 10, [1, 3, 4], graph)
-    linear_ref = linear_ref.to_numpy_indexed_interval()
-
-    finder = SnpKmerFinder(graph, sequence_graph, linear_ref, k=5)
-    finder.find_kmers()
-    assert finder.has_kmer("gggtt", {1})
-    assert finder.has_kmer("cgtac", {3, 4})
-    assert finder.has_kmer("agtac", {2, 4})
-    assert finder.has_kmer("agtac", {2, 4})
-    assert finder.has_kmer("attgt", {4})
 
 if __name__ == "__main__":
 

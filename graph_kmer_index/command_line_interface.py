@@ -10,7 +10,6 @@ from .collision_free_kmer_index import CollisionFreeKmerIndex
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 from obgraph import Graph
-from .index_creator import IndexCreator
 from .snp_kmer_finder import SnpKmerFinder
 import pickle
 from .flat_kmers import FlatKmers
@@ -18,7 +17,7 @@ from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
 from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
-from alignment_free_graph_genotyper.variants import GenotypeCalls
+from alignment_free_graph_genotyper.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
 from graph_kmer_index.shared_mem import to_shared_memory, from_shared_memory
 
@@ -242,7 +241,7 @@ def run_argument_parser(args):
         graph = Graph.from_file(args.graph)
         to_shared_memory(graph, "graph_variant_index_shared")
         logging.info("Reading all variants")
-        variants = GenotypeCalls.from_vcf(args.vcf, skip_index=True, make_generator=True)
+        variants = VcfVariants.from_vcf(args.vcf, skip_index=True, make_generator=True)
         variants = variants.get_chunks(chunk_size=args.chunk_size)
         pool = Pool(args.n_threads)
 

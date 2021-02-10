@@ -1,5 +1,5 @@
 from obgraph import Graph
-from alignment_free_graph_genotyper.variants import GenotypeCalls, VariantGenotype
+from alignment_free_graph_genotyper.variants import VcfVariants, VcfVariant
 from graph_kmer_index.unique_variant_kmers import UniqueVariantKmersFinder
 from graph_kmer_index.reference_kmer_index import ReferenceKmerIndex
 
@@ -22,7 +22,7 @@ def simple_test():
     print(g.ref_offset_to_node)
     print(g.get_node_size(3))
     k = 4
-    variants = GenotypeCalls([VariantGenotype(6, "AAA", "A", "", "DELETION")])
+    variants = VcfVariants([VcfVariant(6, "AAA", "A", "", "DELETION")])
     reference_kmers = ReferenceKmerIndex.from_sequence("CTACCAAATAAATAA", k)
     finder = UniqueVariantKmersFinder(g, reference_kmers, variants, k)
     finder.find_unique_kmers()
