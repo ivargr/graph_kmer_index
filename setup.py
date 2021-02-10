@@ -1,8 +1,8 @@
 from setuptools import setup
-from distutils.core import setup
-from Cython.Build import cythonize
-from distutils.extension import Extension
-from Cython.Distutils import build_ext
+from distutils.core import setup, Extension
+#from Cython.Build import cythonize
+#from distutils.extension import Extension
+#from Cython.Distutils import build_ext
 
 ext_modules=[
     Extension("graph_kmer_index.cython_kmer_index",
@@ -34,6 +34,6 @@ setup(name='graph_kmer_index',
       entry_points={
             'console_scripts': ['graph_kmer_index=graph_kmer_index.command_line_interface:main']
       },
-      cmdclass = {"build_ext": build_ext},
+      #cmdclass = {"build_ext": build_ext},
       ext_modules = ext_modules
 )
