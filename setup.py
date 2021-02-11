@@ -4,6 +4,7 @@ from distutils.core import setup, Extension
 #from distutils.extension import Extension
 #from Cython.Distutils import build_ext
 
+"""
 ext_modules=[
     Extension("graph_kmer_index.cython_kmer_index",
               ["graph_kmer_index/cython_kmer_index.pyx"],
@@ -17,6 +18,7 @@ ext_modules=[
               extra_compile_args = ["-O3", "-ffast-math", "-march=native", "-fopenmp" ],
               extra_link_args=['-fopenmp']
               )]
+"""
 
 setup(name='graph_kmer_index',
       version='0.0.1',
@@ -35,5 +37,5 @@ setup(name='graph_kmer_index',
             'console_scripts': ['graph_kmer_index=graph_kmer_index.command_line_interface:main']
       },
       #cmdclass = {"build_ext": build_ext},
-      ext_modules = ext_modules
+      #ext_modules = ext_modules
 )
