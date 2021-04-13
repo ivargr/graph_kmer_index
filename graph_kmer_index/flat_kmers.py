@@ -57,6 +57,9 @@ class FlatKmers:
         logging.info("Done making flat kmers")
         return FlatKmers(np.array(hashes, dtype=np.uint64), np.array(nodes, np.uint32), ref_offsets, np.array(allele_frequencies, dtype=np.uint16))
 
+    def maximum_kmer_frequency(self, kmer_index_with_frequencies):
+        return max([0] + [kmer_index_with_frequencies.get_frequency(int(kmer)) for kmer in self._hashes])
+
 
 def letter_sequence_to_numeric(sequence):
     if not isinstance(sequence, np.ndarray):
