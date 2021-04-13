@@ -70,6 +70,11 @@ class ReferenceKmerIndex:
         sorting = np.argsort(ref_positions)
         ref_positions = ref_positions[sorting]
         kmers = flat_kmers._hashes[sorting]
+        logging.info("Checking if kmers can be stored as 32 bit")
+        if np.max(kmers) < 2**32:
+            logging.warning("Storing kmers as 32 bit uint since max hash is low enough")
+            kmers = kmers.astype(np.uint32)
+
         nodes = flat_kmers._nodes[sorting]
 
         assert len(kmers) < 4294967295, "Too many kmers to store (32 bit limit reached). There are %d kmers" % len(kmers)
