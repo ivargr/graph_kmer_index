@@ -5,8 +5,9 @@ from .snp_kmer_finder import SnpKmerFinder
 from .flat_kmers import FlatKmers
 from obgraph import VariantNotFoundException
 
+
 class UniqueVariantKmersFinder:
-    def __init__(self, graph, variants, k=31, max_variant_nodes=6):
+    def __init__(self, graph, variants, k=31, max_variant_nodes=6, kmer_index_with_frequencies=None):
         self.graph = graph
         self.reference_kmer_index = None
         self.variants = variants
@@ -16,6 +17,7 @@ class UniqueVariantKmersFinder:
         self._n_skipped_because_added_on_other_node = 0
         self._hashes_added = set()
         self._max_variant_nodes = max_variant_nodes
+        self._kmer_index_with_frequencies = kmer_index_with_frequencies
 
     def kmer_is_unique_on_reference_position(self, kmer, reference_position, ref_start, ref_end):
         # returns true if kmer is unique when ignoring kmers on same ref pos
@@ -33,6 +35,8 @@ class UniqueVariantKmersFinder:
         has_added = False
         # Start searching from before. The last position is probably the best for indels, since the sequence after is offset-ed. We want to end on this, because this is what is chosen if all else fails
         possible_ref_positions = [variant.position - i for i in range(1, self.k - 2)][::-1]
+        valid_positions_found = []
+
         for possible_ref_position in possible_ref_positions:
             possible_ref_position_adjusted = self.graph.convert_chromosome_ref_offset_to_graph_ref_offset(possible_ref_position, variant.chromosome)
             is_valid = True
@@ -73,6 +77,12 @@ class UniqueVariantKmersFinder:
             if is_valid:
                 # Kmers are valid, we don't need to search anymore for this variant
                 flat = finder.get_flat_kmers()
+                valid_positions_found.append(flat)
+
+                if flat.maximum_kmer_frequency(self._kmer_index_with_frequencies) <= 1:
+                    # no need to search for more positions, all kemrs are unique
+                    break
+
                 if len(flat._nodes) == 0:
                     logging.warning("Found 0 nodes for variant %s. Hashes: %s, ref positions: %s. Searched from ref position %d" % (variant, flat._hashes, flat._ref_offsets, possible_ref_position))
                     #raise Exception("No kmers found")
@@ -86,26 +96,24 @@ class UniqueVariantKmersFinder:
                     logging.warning("Found no variant node kmers for variant %s. Hashes: %s, ref positions: %s. Searched from ref position %d" % (variant, flat._hashes, flat._ref_offsets, possible_ref_position))
                     #raise Exception("No kmers found")
 
-                self.flat_kmers_found.append(flat)
-                has_added = True
-                for hash in flat._hashes:
-                    self._hashes_added.add(hash)
-
-
-                break
-
-        if not has_added and False:
-            logging.warning("Did not add any kmers for variant %s (nodes: %d/%d)" % (variant, ref_node, variant_node))
+        # Sort positions by max kmer frequency
+        if len(valid_positions_found) == 0:
+            logging.warning("Found no positions with valid kmers for variant %s" % variant)
             self.n_failed_variants += 1
-        if not is_valid or not has_added:
-            #logging.warning("Traversed a variant %s, nodes %d/%d without finding unique kmers" % (variant, ref_node, variant_node))
-            self.n_failed_variants += 1
+            return
+
+        valid_positions_found = sorted(valid_positions_found, key=lambda p: p.maximum_kmer_frequency(self._kmer_index_with_frequencies))
+        best_position = valid_positions_found[0]
+        self.flat_kmers_found.append(best_position)
+        for hash in flat._hashes:
+            self._hashes_added.add(hash)
+
 
     def find_unique_kmers(self):
         prev_time = time.time()
         for i, variant in enumerate(self.variants):
             n_processed = len(self.flat_kmers_found)
-            if i % 50000 == 0:
+            if i % 1000 == 0:
                 logging.info("%d/%d variants processed (time spent on previous 50k variants: %.3f s). Now on chromosome/ref pos %d/%d" % (i, len(self.variants), time.time()-prev_time, variant.chromosome, variant.position))
                 prev_time = time.time()
 

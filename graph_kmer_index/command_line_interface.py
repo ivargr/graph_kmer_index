@@ -231,13 +231,16 @@ def run_argument_parser(args):
 
     def make_unique_variant_kmers_single_thread(variants, args):
         graph = from_shared_memory(Graph, "graph_variant_index_shared")
+        kmer_index = from_shared_memory(CollisionFreeKmerIndex, "kmer_index_shared")
         #graph = Graph.from_file(args.graph)
         logging.info("Reading all variants")
-        finder = UniqueVariantKmersFinder(graph, variants, args.kmer_size, args.max_variant_nodes)
+        finder = UniqueVariantKmersFinder(graph, variants, args.kmer_size, args.max_variant_nodes, kmer_index_with_frequencies=kmer_index)
         flat_kmers = finder.find_unique_kmers()
         return flat_kmers
 
     def make_unique_variant_kmers(args):
+        kmer_index = CollisionFreeKmerIndex.from_file(args.kmer_index)
+        to_shared_memory(kmer_index, "kmer_index_shared")
         graph = Graph.from_file(args.graph)
         to_shared_memory(graph, "graph_variant_index_shared")
         logging.info("Reading all variants")
@@ -257,6 +260,7 @@ def run_argument_parser(args):
     subparser = subparsers.add_parser("make_unique_variant_kmers", help="Make a reverse variant index lookup to unique kmers on that variant")
     subparser.add_argument("-g", "--graph", required=True)
     subparser.add_argument("-k", "--kmer-size", required=True, type=int)
+    subparser.add_argument("-i", "--kmer-index", required=True, help="Kmer index used to check frequency of kmers in genome")
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-v", "--vcf", required=True)
     subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
@@ -278,6 +282,20 @@ def run_argument_parser(args):
     subparser.add_argument("-f", "--flat-kmers", required="true", help="Comma-separeted list of file names to be merged")
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.set_defaults(func=merge_flat_kmers)
+
+    def make_kmer_frequencies(args):
+        from .kmer_frequency_index import KmerFrequencyIndex
+        ref_kmers = ReferenceKmerIndex.from_file(args.reference_kmers)
+        index = KmerFrequencyIndex.from_kmers(ref_kmers.kmers)
+        index.to_file(args.out_file_name)
+        logging.info("Wrote to file %s" % args.out_file_name)
+
+    subparser = subparsers.add_parser("make_kmer_frequency_index")
+    subparser.add_argument("-r", "--reference-kmers", required=True)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.set_defaults(func=make_kmer_frequencies)
+
+
 
     if len(args) == 0:
         parser.print_help()
