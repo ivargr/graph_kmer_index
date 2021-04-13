@@ -72,6 +72,12 @@ class CollisionFreeKmerIndex:
 
         return self._nodes[hit_positions + start], self._ref_offsets[hit_positions + start], frequencies, allele_frequencies
 
+    def get_frequency(self, kmer):
+        nodes, ref_offsets, frequencies, allele_frequencies = self.get(kmer, max_hits=1000000000000000)
+        if nodes is None:
+            return False
+        return frequencies[0]
+
     def get_nodes_and_ref_offsets_from_multiple_kmers(self, kmers, max_hits=10):
         all_nodes = []
         all_ref_offsets = []
@@ -129,7 +135,12 @@ class CollisionFreeKmerIndex:
         except FileNotFoundError:
             data = np.load(file_name)
 
-        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"], data["allele_frequencies"])
+        if "allele_frequencies" in data:
+            allele_frequencies = data["allele_frequencies"]
+        else:
+            allele_frequencies = np.zeros(len(data["ref_offsets"]))
+
+        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"], allele_frequencies)
 
     @classmethod
     def from_flat_kmers(cls, flat_kmers, modulo=452930477, skip_frequencies=False):
