@@ -2,6 +2,8 @@ import numpy as np
 import logging
 import pickle
 
+from graph_kmer_index import kmer_hash_to_sequence, sequence_to_kmer_hash
+from Bio.Seq import Seq
 
 class CollisionFreeKmerIndex:
     properties = {
@@ -30,6 +32,24 @@ class CollisionFreeKmerIndex:
 
         self._allele_frequencies = allele_frequencies
 
+    def set_allele_frequencies(self, frequencies):
+        pass
+
+    def set_frequencies_using_other_index(self, other, multiplier=1, min_frequency=1):
+        unique = np.unique(self._kmers)
+        for i, kmer in enumerate(unique):
+            kmer = int(kmer)
+            if i % 100000 == 0:
+                logging.info("%d/%d unique kmers processed" % (i, len(unique)))
+            frequency = other.get_frequency(kmer)
+            hash = int(kmer) % self._modulo
+            position = self._hashes_to_index[hash]
+            n_hits = self._n_kmers[hash]
+            start = position
+            end = position + n_hits
+            hit_positions = np.where(self._kmers[start:end] == kmer)[0]
+            self._frequencies[hit_positions + start] = max(min_frequency, frequency * multiplier)
+
     def set_frequencies(self, skip=False):
         logging.info("Setting frequencies")
         # Count number of each kmer (not hashes, store these)
@@ -42,7 +62,7 @@ class CollisionFreeKmerIndex:
         unique = np.unique(self._kmers)
         for i, kmer in enumerate(unique):
             if i % 100000 == 0:
-                logging.info("%d/%d kmers processed" % (i, len(unique)))
+                logging.info("%d/%d unique kmers processed" % (i, len(unique)))
 
             hash = int(kmer) % self._modulo
             position = self._hashes_to_index[hash]
@@ -72,11 +92,23 @@ class CollisionFreeKmerIndex:
 
         return self._nodes[hit_positions + start], self._ref_offsets[hit_positions + start], frequencies, allele_frequencies
 
-    def get_frequency(self, kmer):
+    def get_frequency(self, kmer, include_reverse_complement=True, k=31):
         nodes, ref_offsets, frequencies, allele_frequencies = self.get(kmer, max_hits=1000000000000000)
         if nodes is None:
-            return False
-        return frequencies[0]
+            f = 0
+        else:
+            f = frequencies[0]
+
+        if include_reverse_complement:
+            sequence = kmer_hash_to_sequence(kmer, k)
+            rev_sequence = str(Seq(sequence).reverse_complement())
+            rev_kmer = sequence_to_kmer_hash(rev_sequence)
+            nodes, ref_offsets, frequencies, allele_frequencies = self.get(rev_kmer, max_hits=1000000000000000)
+
+            if nodes is not None:
+                f += frequencies[0]
+
+        return f
 
     def get_nodes_and_ref_offsets_from_multiple_kmers(self, kmers, max_hits=10):
         all_nodes = []
@@ -143,7 +175,9 @@ class CollisionFreeKmerIndex:
         return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"], allele_frequencies)
 
     @classmethod
-    def from_flat_kmers(cls, flat_kmers, modulo=452930477, skip_frequencies=False):
+    def from_flat_kmers(cls, flat_kmers, modulo=452930477, skip_frequencies=False, skip_singletons=False):
+        if skip_singletons:
+            flat_kmers = flat_kmers.get_new_without_singletons()
 
         kmers = flat_kmers._hashes
         nodes = flat_kmers._nodes
@@ -174,7 +208,13 @@ class CollisionFreeKmerIndex:
         # Find out how many entries there are for each unique hash
         object = cls(lookup, n_kmers, nodes, ref_offsets, kmers, modulo, allele_frequencies=allele_frequencies)
         object.set_frequencies(skip_frequencies)
+
+        if skip_singletons:
+            logging.info("Adding 1 to all frequencies since singletons are skipped")
+            object._frequencies += 1
+
         return object
+
 
 
 

@@ -57,8 +57,40 @@ class FlatKmers:
         logging.info("Done making flat kmers")
         return FlatKmers(np.array(hashes, dtype=np.uint64), np.array(nodes, np.uint32), ref_offsets, np.array(allele_frequencies, dtype=np.uint16))
 
+    def sum_of_kmer_frequencies(self, kmer_index_with_frequencies):
+        return sum([0] + [max(1, kmer_index_with_frequencies.get_frequency(int(kmer))) for kmer in self._hashes])
+
     def maximum_kmer_frequency(self, kmer_index_with_frequencies):
         return max([0] + [kmer_index_with_frequencies.get_frequency(int(kmer)) for kmer in self._hashes])
+    
+    def get_new_without_singletons(self):
+        has_been_traversed = set()
+        new_hashes = []
+        new_nodes = []
+        new_ref_offsets = []
+        new_allele_frequencies = []
+
+        for i in range(len(self._hashes)):
+            if i % 1000000 == 0:
+                logging.info("%d entries processed. %d kept" % (i, len(new_hashes)))
+
+            hash = self._hashes[i]
+            if hash in has_been_traversed:
+                new_hashes.append(hash)
+                new_nodes.append(self._nodes[i])
+                new_ref_offsets.append(self._ref_offsets[i])
+                new_allele_frequencies.append(self._allele_frequencies[i])
+            else:
+                has_been_traversed.add(hash)
+
+        logging.info("Making new numpy arrays")
+        new_hashes = np.array(new_hashes, dtype=self._hashes.dtype)
+        new_nodes = np.array(new_nodes, dtype=self._nodes.dtype)
+        new_ref_offsets = np.array(new_ref_offsets, dtype=self._ref_offsets.dtype)
+        new_allele_frequencies = np.array(new_allele_frequencies, dtype=self._allele_frequencies.dtype)
+
+        logging.info("Returning new flat kmers")
+        return FlatKmers(new_hashes, new_nodes, new_ref_offsets, new_allele_frequencies)
 
 
 def letter_sequence_to_numeric(sequence):

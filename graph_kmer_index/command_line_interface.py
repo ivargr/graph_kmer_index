@@ -5,6 +5,7 @@ import logging
 from multiprocessing import Pool, Process
 import numpy as np
 from itertools import repeat
+from pyfaidx import Fasta
 
 from .collision_free_kmer_index import CollisionFreeKmerIndex
 
@@ -20,6 +21,7 @@ from pathos.multiprocessing import Pool
 from alignment_free_graph_genotyper.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
 from graph_kmer_index.shared_mem import to_shared_memory, from_shared_memory
+from obgraph.variant_to_nodes import VariantToNodes
 
 
 def main():
@@ -35,7 +37,15 @@ def create_index_single_thread(args, interval=None):
 
     logging.info("Loading data")
     #graph = Graph.from_file(args.graph_file_name)
-    graph = from_shared_memory(Graph, "graph_shared")
+    if args.graph_file_name is not None:
+        graph = from_shared_memory(Graph, "graph_shared")
+        reference = None
+    else:
+        graph = None
+        assert args.reference_fasta is not None
+        assert args.reference_name is not None, "Reference name must be specified"
+        reference = Fasta(args.reference_fasta)[args.reference_name]
+
     logging.info("Running kmerfinder")
     whitelist = None
     if args.whitelist is not None:
@@ -59,14 +69,17 @@ def create_index_single_thread(args, interval=None):
                            start_position=start_position,
                            end_position=end_position,
                            skip_kmers_with_nodes=skip_kmers_with_nodes,
-                           only_save_one_node_per_kmer=args.only_save_one_node_per_kmer)
+                           only_save_one_node_per_kmer=args.only_save_one_node_per_kmer,
+                           reference=reference)
 
     kmers = finder.find_kmers()
     return kmers
 
 def create_index(args):
-    graph = Graph.from_file(args.graph_file_name)
-    to_shared_memory(graph, "graph_shared")
+    if args.graph_file_name is not None:
+        graph = Graph.from_file(args.graph_file_name)
+        to_shared_memory(graph, "graph_shared")
+
     if args.threads == 1:
         kmers = create_index_single_thread(args)
         kmers.to_file(args.out_file_name)
@@ -108,7 +121,8 @@ def create_index(args):
 
 def make_from_flat(args):
     flat = FlatKmers.from_file(args.flat_index)
-    index = CollisionFreeKmerIndex.from_flat_kmers(flat, modulo=args.hash_modulo, skip_frequencies=args.skip_frequencies)
+    index = CollisionFreeKmerIndex.from_flat_kmers(flat, modulo=args.hash_modulo, skip_frequencies=args.skip_frequencies,
+                                                   skip_singletons=args.skip_singletons)
     index.to_file(args.out_file_name)
     logging.info("Done making kmer index")
 
@@ -182,7 +196,7 @@ def run_argument_parser(args):
 
     subparsers = parser.add_subparsers()
     subparser = subparsers.add_parser("make")
-    subparser.add_argument("-g", "--graph_file_name", required=True)
+    subparser.add_argument("-g", "--graph_file_name", required=False)
     subparser.add_argument("-o", "--out_file_name", required=True)
     subparser.add_argument("-k", "--kmer_size", required=False, type=int, default=31)
     subparser.add_argument("-r", "--include-reverse-complement", required=False, type=bool, default=False)
@@ -198,6 +212,8 @@ def run_argument_parser(args):
     subparser.add_argument("-w", "--whitelist", required=False, help="Only add kmers in this whitelist (should be a flat kmers file)")
     subparser.add_argument("-t", "--threads", required=False, default=1, type=int, help="How many threads to use. Some parameters will have local effect if t > 1 (-M)")
     subparser.add_argument("-G", "--genome-size", required=False, default=3000000000, type=int, help="Must be set if --threads > 1 (used to make chunks to run in parallel)")
+    subparser.add_argument("-R", "--reference-fasta", required=False, help="Make from this reference fasta instead of graph")
+    subparser.add_argument("-n", "--reference-name", required=False, help="Name of reference in fasta file. Needed when reference fasta is used.")
 
     subparser.set_defaults(func=create_index)
 
@@ -206,6 +222,7 @@ def run_argument_parser(args):
     subparser.add_argument("-f", "--flat-index", required=True)
     subparser.add_argument("-m", "--hash_modulo", required=False, type=int, default=452930477)
     subparser.add_argument("-S", "--skip-frequencies", type=bool, default=False, required=False)
+    subparser.add_argument("-s", "--skip-singletons", type=bool, default=False, required=False)
     subparser.set_defaults(func=make_from_flat)
 
     subparser = subparsers.add_parser("make_reverse")
@@ -230,19 +247,25 @@ def run_argument_parser(args):
     subparser.set_defaults(func=make_reference_kmer_index)
 
     def make_unique_variant_kmers_single_thread(variants, args):
-        graph = from_shared_memory(Graph, "graph_variant_index_shared")
+        variant_to_nodes = from_shared_memory(VariantToNodes, "variant_to_nodes_shared")
         kmer_index = from_shared_memory(CollisionFreeKmerIndex, "kmer_index_shared")
+        graph = from_shared_memory(Graph, "graph_shared")
         #graph = Graph.from_file(args.graph)
         logging.info("Reading all variants")
-        finder = UniqueVariantKmersFinder(graph, variants, args.kmer_size, args.max_variant_nodes, kmer_index_with_frequencies=kmer_index)
+        finder = UniqueVariantKmersFinder(graph, variant_to_nodes, variants, args.kmer_size, args.max_variant_nodes, kmer_index_with_frequencies=kmer_index)
         flat_kmers = finder.find_unique_kmers()
         return flat_kmers
 
     def make_unique_variant_kmers(args):
+        logging.info("Reading kmer index")
         kmer_index = CollisionFreeKmerIndex.from_file(args.kmer_index)
         to_shared_memory(kmer_index, "kmer_index_shared")
+        logging.info("Reading variant to nodes")
+        variant_to_nodes = VariantToNodes.from_file(args.variant_to_nodes)
+        to_shared_memory(variant_to_nodes, "variant_to_nodes_shared")
+        logging.info("REading graph")
         graph = Graph.from_file(args.graph)
-        to_shared_memory(graph, "graph_variant_index_shared")
+        to_shared_memory(graph, "graph_shared")
         logging.info("Reading all variants")
         variants = VcfVariants.from_vcf(args.vcf, skip_index=True, make_generator=True)
         variants = variants.get_chunks(chunk_size=args.chunk_size)
@@ -259,6 +282,7 @@ def run_argument_parser(args):
 
     subparser = subparsers.add_parser("make_unique_variant_kmers", help="Make a reverse variant index lookup to unique kmers on that variant")
     subparser.add_argument("-g", "--graph", required=True)
+    subparser.add_argument("-V", "--variant_to_nodes", required=True)
     subparser.add_argument("-k", "--kmer-size", required=True, type=int)
     subparser.add_argument("-i", "--kmer-index", required=True, help="Kmer index used to check frequency of kmers in genome")
     subparser.add_argument("-o", "--out-file-name", required=True)
@@ -295,7 +319,33 @@ def run_argument_parser(args):
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.set_defaults(func=make_kmer_frequencies)
 
+    def set_frequencies_using_other_index(args):
 
+        logging.info("Reading index")
+        index = CollisionFreeKmerIndex.from_file(args.kmer_index)
+        logging.info("Reading other index")
+        other = CollisionFreeKmerIndex.from_file(args.kmer_index_with_frequencies)
+        index.set_frequencies_using_other_index(other, args.multiplier)
+        index.to_file(args.kmer_index)
+        logging.info("Wrote index to file %s" % args.kmer_index)
+
+    subparser = subparsers.add_parser("set_frequencies_using_other_index")
+    subparser.add_argument("-i", "--kmer-index", required=True)
+    subparser.add_argument("-f", "--kmer-index-with-frequencies", required=True)
+    subparser.add_argument("-m", "--multiplier", required=False, type=int, default=1)
+    subparser.set_defaults(func=set_frequencies_using_other_index)
+
+    def set_allele_frequencies(args):
+        index = CollisionFreeKmerIndex.from_file(args.kmer_index)
+        frequencies = np.load(args.frequencies)
+        index.set_allele_frequencies(frequencies)
+        index.to_file(args.kmer_index)
+        logging.info("Wrote index to file %s" % args.kmer_index)
+
+    subparser = subparsers.add_parser("set_allele_frequencies")
+    subparser.add_argument("-i", "--kmer-index", required=True)
+    subparser.add_argument("-f", "--frequencies", required=True)
+    subparser.set_defaults(func=set_allele_frequencies)
 
     if len(args) == 0:
         parser.print_help()

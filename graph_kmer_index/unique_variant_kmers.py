@@ -7,15 +7,15 @@ from obgraph import VariantNotFoundException
 
 
 class UniqueVariantKmersFinder:
-    def __init__(self, graph, variants, k=31, max_variant_nodes=6, kmer_index_with_frequencies=None):
+    def __init__(self, graph, variant_to_nodes, variants, k=31, max_variant_nodes=6, kmer_index_with_frequencies=None):
         self.graph = graph
+        self.variant_to_nodes = variant_to_nodes
         self.reference_kmer_index = None
         self.variants = variants
         self.k = k
         self.flat_kmers_found = []
         self.n_failed_variants = 0
         self._n_skipped_because_added_on_other_node = 0
-        self._hashes_added = set()
         self._max_variant_nodes = max_variant_nodes
         self._kmer_index_with_frequencies = kmer_index_with_frequencies
 
@@ -103,10 +103,9 @@ class UniqueVariantKmersFinder:
             return
 
         valid_positions_found = sorted(valid_positions_found, key=lambda p: p.maximum_kmer_frequency(self._kmer_index_with_frequencies))
+        #valid_positions_found = sorted(valid_positions_found, key=lambda p: p.sum_of_kmer_frequencies(self._kmer_index_with_frequencies))
         best_position = valid_positions_found[0]
         self.flat_kmers_found.append(best_position)
-        for hash in flat._hashes:
-            self._hashes_added.add(hash)
 
 
     def find_unique_kmers(self):
@@ -114,13 +113,14 @@ class UniqueVariantKmersFinder:
         for i, variant in enumerate(self.variants):
             n_processed = len(self.flat_kmers_found)
             if i % 1000 == 0:
-                logging.info("%d/%d variants processed (time spent on previous 50k variants: %.3f s). Now on chromosome/ref pos %d/%d" % (i, len(self.variants), time.time()-prev_time, variant.chromosome, variant.position))
+                logging.info("%d/%d variants processed (time spent on previous 1000 variants: %.3f s). Now on chromosome/ref pos %d/%d" % (i, len(self.variants), time.time()-prev_time, variant.chromosome, variant.position))
                 prev_time = time.time()
 
-            try:
-                ref_node, variant_node = self.graph.get_variant_nodes(variant)
-            except VariantNotFoundException:
-                logging.warning("Variant %s not found" % variant)
+            #ref_node, variant_node = self.graph.get_variant_nodes(variant)
+            ref_node = self.variant_to_nodes.ref_nodes[variant.vcf_line_number]
+            variant_node = self.variant_to_nodes.var_nodes[variant.vcf_line_number]
+
+            if ref_node == 0 or variant_node == 0:
                 continue
 
             self.find_unique_kmers_over_variant(variant, ref_node, variant_node)
