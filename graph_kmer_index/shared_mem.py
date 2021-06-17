@@ -9,7 +9,7 @@ class SingleSharedArray:
         self.array = array
 
 def to_shared_memory(object, name):
-    logging.info("Writing to shared memory %s" % name)
+    logging.debug("Writing to shared memory %s" % name)
     meta_information = {}
     for property_name in object.properties:
         data = object.__getattribute__(property_name)
@@ -28,17 +28,16 @@ def to_shared_memory(object, name):
         # Make shared memory and copy data to buffer
         #logging.info("Field %s has shape %s and type %s" % (property_name, data_shape, data_type))
         try:
-            sa.delete(name + "_" + property_name)
-            logging.info("Deleted already shared memory")
+            sa.delete(name + "__" + property_name)
         except FileNotFoundError:
-            logging.info("No existing shared memory, can create new one")
+            logging.debug("No existing shared memory, can create new one")
 
-        shared_array = sa.create(name + "_" + property_name, data_shape, data_type)
+        shared_array = sa.create(name + "__" + property_name, data_shape, data_type)
         shared_array[:] = data
 
     f = open(name + "_meta.shm", "wb")
     pickle.dump(meta_information, f)
-    logging.info("Done writing to shared memory")
+    logging.debug("Done writing to shared memory")
     #logging.info("Wrote meta data to file")
 
 
@@ -49,7 +48,7 @@ def from_shared_memory(cls, name):
         data_type = data[0]
         data_shape = data[1]
         #logging.info("Found property %s with shape %s and type %s" % (property_name, data_shape, data_type))
-        data = sa.attach(name + "_" + property_name)
+        data = sa.attach(name + "__" + property_name)
         # Single ints are wrapped in arrays
         if len(data) == 1 and property_name == "_modulo":
             data = data[0]
@@ -60,7 +59,21 @@ def from_shared_memory(cls, name):
     return object
 
 
-def remove_shared_memory():
+def remove_shared_memory(name):
+    shared_memories = [s.name.decode("utf-8") for s in sa.list()]
+
+    for m in shared_memories:
+        if m.startswith(name + "__"):
+            sa.delete(m)
+            return
+
+    logging.warning("No shared memory with name %s" % name)
+    logging.warning("Available shared memories: %s" % available)
+
+
+
+
+def remove_all_shared_memory():
     for shared in sa.list():
         logging.info("Deleting %s" % shared.name.decode("utf-8"))
         sa.delete(shared.name.decode("utf-8"))
