@@ -92,6 +92,25 @@ class CollisionFreeKmerIndex:
 
         return self._nodes[hit_positions + start], self._ref_offsets[hit_positions + start], frequencies, allele_frequencies
 
+    def get_grouped_nodes(self, kmer, max_hits=10):
+        hits = self.get(kmer, max_hits)
+        if hits[0] is None:
+            return None
+
+        ref_offsets = hits[1]
+        nodes = hits[0]
+        sorting = np.argsort(ref_offsets)
+        ref_offsets = ref_offsets[sorting]
+        nodes = nodes[sorting]
+
+
+        _, hit_indexes = np.unique(ref_offsets, return_index=True)
+        hit_indexes = list(hit_indexes)
+        hit_indexes.append(len(ref_offsets))
+
+        intervals = [(start, end) for start, end in zip(hit_indexes[0:-1], hit_indexes[1:])]
+        return [nodes[start:end] for start, end in intervals]
+
     def get_frequency(self, kmer, include_reverse_complement=True, k=31):
         nodes, ref_offsets, frequencies, allele_frequencies = self.get(kmer, max_hits=1000000000000000)
         if nodes is None:
