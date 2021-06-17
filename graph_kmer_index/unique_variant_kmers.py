@@ -7,7 +7,8 @@ from obgraph import VariantNotFoundException
 
 
 class UniqueVariantKmersFinder:
-    def __init__(self, graph, variant_to_nodes, variants, k=31, max_variant_nodes=6, kmer_index_with_frequencies=None):
+    def __init__(self, graph, variant_to_nodes, variants, k=31, max_variant_nodes=6, kmer_index_with_frequencies=None, haplotype_matrix=None, node_to_variants=None,
+                 do_not_choose_lowest_frequency_kmers=False):
         self.graph = graph
         self.variant_to_nodes = variant_to_nodes
         self.reference_kmer_index = None
@@ -18,6 +19,12 @@ class UniqueVariantKmersFinder:
         self._n_skipped_because_added_on_other_node = 0
         self._max_variant_nodes = max_variant_nodes
         self._kmer_index_with_frequencies = kmer_index_with_frequencies
+        self.haplotype_matrix = haplotype_matrix
+        self.node_to_variants = node_to_variants
+
+        self._choose_kmers_with_lowest_frequencies = True
+        if do_not_choose_lowest_frequency_kmers:
+            self._choose_kmers_with_lowest_frequencies = False
 
     def kmer_is_unique_on_reference_position(self, kmer, reference_position, ref_start, ref_end):
         # returns true if kmer is unique when ignoring kmers on same ref pos
@@ -40,7 +47,8 @@ class UniqueVariantKmersFinder:
         for possible_ref_position in possible_ref_positions:
             possible_ref_position_adjusted = self.graph.convert_chromosome_ref_offset_to_graph_ref_offset(possible_ref_position, variant.chromosome)
             is_valid = True
-            finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=self._max_variant_nodes, only_store_nodes=set([ref_node, variant_node]))
+            finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=self._max_variant_nodes, only_store_nodes=set([ref_node, variant_node]),
+                                   haplotype_matrix=self.haplotype_matrix, node_to_variants=self.node_to_variants, variant_to_nodes=self.variant_to_nodes)
             finder.find_kmers_from_linear_ref_position(possible_ref_position_adjusted)
 
 
@@ -102,7 +110,9 @@ class UniqueVariantKmersFinder:
             self.n_failed_variants += 1
             return
 
-        valid_positions_found = sorted(valid_positions_found, key=lambda p: p.maximum_kmer_frequency(self._kmer_index_with_frequencies))
+        if self._choose_kmers_with_lowest_frequencies:
+            valid_positions_found = sorted(valid_positions_found, key=lambda p: p.maximum_kmer_frequency(self._kmer_index_with_frequencies))
+
         #valid_positions_found = sorted(valid_positions_found, key=lambda p: p.sum_of_kmer_frequencies(self._kmer_index_with_frequencies))
         best_position = valid_positions_found[0]
         self.flat_kmers_found.append(best_position)
@@ -112,8 +122,8 @@ class UniqueVariantKmersFinder:
         prev_time = time.time()
         for i, variant in enumerate(self.variants):
             n_processed = len(self.flat_kmers_found)
-            if i % 1000 == 0:
-                logging.info("%d/%d variants processed (time spent on previous 1000 variants: %.3f s). Now on chromosome/ref pos %d/%d" % (i, len(self.variants), time.time()-prev_time, variant.chromosome, variant.position))
+            if i % 10000 == 0:
+                logging.info("%d/%d variants processed (time spent on previous 10000 variants: %.3f s). Now on chromosome/ref pos %d/%d" % (i, len(self.variants), time.time()-prev_time, variant.chromosome, variant.position))
                 prev_time = time.time()
 
             #ref_node, variant_node = self.graph.get_variant_nodes(variant)

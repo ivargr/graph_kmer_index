@@ -67,7 +67,7 @@ class SnpKmerFinder:
     def __init__(self, graph, k=15, spacing=None, include_reverse_complements=False, pruning=False, max_kmers_same_position=100000,
                  max_frequency=10000, max_variant_nodes=10000, only_add_variant_kmers=False, whitelist=None, only_save_variant_nodes=False,
                  start_position=None, end_position=None, only_store_nodes=None, skip_kmers_with_nodes=None, only_save_one_node_per_kmer=False,
-                 reference=None):
+                 reference=None, variant_to_nodes=None, node_to_variants=None, haplotype_matrix=None):
         self.graph = graph
         self.reference = reference
         self.k = k
@@ -86,6 +86,7 @@ class SnpKmerFinder:
         self._current_ref_offset = None
         self._last_ref_pos_added = 0
         self.pruning = pruning
+        self._n_kmers_skipped_low_allele_frequency = 0
         self._n_kmers_pruned = 0
         self._has_traversed_variant = False
         self._unique_kmers_added = set()
@@ -106,6 +107,9 @@ class SnpKmerFinder:
         self._skip_kmers_with_nodes = skip_kmers_with_nodes
         self._n_skipped_blacklist_nodes = 0
         self._only_save_one_node_per_kmer = only_save_one_node_per_kmer
+        self.haplotype_matrix = haplotype_matrix
+        self.variant_to_nodes = variant_to_nodes
+        self.node_to_variants = node_to_variants
 
         if self._start_position == None:
             self._start_position = 0
@@ -193,7 +197,17 @@ class SnpKmerFinder:
         self._unique_kmers_added.add(hash)
         self._kmer_frequencies[hash] += 1
 
-        kmer_allele_frequency = min([self.graph.get_node_allele_frequency(node) for node in nodes])
+
+        if self.haplotype_matrix is not None:
+            kmer_allele_frequency = self.haplotype_matrix.get_allele_frequency_for_nodes(nodes, self.node_to_variants, self.variant_to_nodes)
+        else:
+            kmer_allele_frequency = min([self.graph.get_node_allele_frequency(node) for node in nodes])
+
+        if kmer_allele_frequency < 0.00001:
+            self._n_kmers_skipped_low_allele_frequency += 1
+            return
+
+
         for node in nodes:
             if self._only_save_variant_nodes and node not in self._variant_nodes:
                 continue
@@ -347,8 +361,11 @@ class SnpKmerFinder:
             if i % 100000 == 0:
 
                 logging.info("On ref position %d/%s. Time spent: %.3f. %d/%d basepairs traversed. %d kmers found. Have pruned %d kmers. "
-                             "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d. Skipped because blacklisted node: %d"
-                             % (pos, self._end_position, time.time() - prev_time, (i - self._start_position//self.spacing) * self.spacing, self._end_position-self._start_position, self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes, self._n_skipped_blacklist_nodes))
+                             "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d. Skipped because blacklisted node: %d. Skipped low allele freq: %d"
+                             % (pos, self._end_position, time.time() - prev_time, (i - self._start_position//self.spacing) * self.spacing, self._end_position-self._start_position,
+                                self._kmers_found, self._n_kmers_pruned, self._n_kmers_skipped, self._n_skipped_due_to_frequency, self._n_skipped_due_to_max_variant_nodes, self._n_skipped_blacklist_nodes,
+                                self._n_kmers_skipped_low_allele_frequency))
+
                 prev_time = time.time()
                 if self._whitelist is not None:
                     logging.info("N skipped because not in whitelist: %d" % self._n_skipped_whitelist)

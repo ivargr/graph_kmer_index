@@ -21,7 +21,8 @@ from pathos.multiprocessing import Pool
 from alignment_free_graph_genotyper.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
 from graph_kmer_index.shared_mem import to_shared_memory, from_shared_memory
-from obgraph.variant_to_nodes import VariantToNodes
+from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
+from obgraph.haplotype_matrix import HaplotypeMatrix
 
 
 def main():
@@ -252,7 +253,17 @@ def run_argument_parser(args):
         graph = from_shared_memory(Graph, "graph_shared")
         #graph = Graph.from_file(args.graph)
         logging.info("Reading all variants")
-        finder = UniqueVariantKmersFinder(graph, variant_to_nodes, variants, args.kmer_size, args.max_variant_nodes, kmer_index_with_frequencies=kmer_index)
+
+        node_to_variants = None
+        haplotype_matrix = None
+        if args.haplotype_matrix is not None:
+            haplotype_matrix = HaplotypeMatrix.from_file(args.haplotype_matrix)
+            node_to_variants = NodeToVariants.from_file(args.node_to_variants)
+
+        finder = UniqueVariantKmersFinder(graph, variant_to_nodes, variants, args.kmer_size, args.max_variant_nodes,
+                                          kmer_index_with_frequencies=kmer_index, haplotype_matrix=haplotype_matrix,
+                                          node_to_variants=node_to_variants,
+                                          do_not_choose_lowest_frequency_kmers=args.do_not_choose_lowest_frequency_kmers)
         flat_kmers = finder.find_unique_kmers()
         return flat_kmers
 
@@ -283,6 +294,8 @@ def run_argument_parser(args):
     subparser = subparsers.add_parser("make_unique_variant_kmers", help="Make a reverse variant index lookup to unique kmers on that variant")
     subparser.add_argument("-g", "--graph", required=True)
     subparser.add_argument("-V", "--variant_to_nodes", required=True)
+    subparser.add_argument("-N", "--node-to-variants", required=False)
+    subparser.add_argument("-H", "--haplotype-matrix", required=False)
     subparser.add_argument("-k", "--kmer-size", required=True, type=int)
     subparser.add_argument("-i", "--kmer-index", required=True, help="Kmer index used to check frequency of kmers in genome")
     subparser.add_argument("-o", "--out-file-name", required=True)
@@ -290,6 +303,7 @@ def run_argument_parser(args):
     subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
     subparser.add_argument("-c", "--chunk-size", required=False, default=10000, type=int, help="Number of variants given to each thread")
     subparser.add_argument("-m", "--max-variant-nodes", required=False, default=6, type=int, help="Maximum number of variant nodes allowed in kmer")
+    subparser.add_argument("-d", "--do-not-choose-lowest-frequency-kmers", required=False, type=bool, help="For testing only. Will not choose the best kmers.")
     subparser.set_defaults(func=make_unique_variant_kmers)
 
     subparser = subparsers.add_parser("prune_flat_kmers")
