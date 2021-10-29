@@ -1,5 +1,5 @@
 from obgraph import Graph
-from alignment_free_graph_genotyper.variants import VcfVariants, VcfVariant
+from kage.variants import VcfVariants, VcfVariant
 from graph_kmer_index.unique_variant_kmers import UniqueVariantKmersFinder
 from graph_kmer_index.reference_kmer_index import ReferenceKmerIndex
 

@@ -1,4 +1,4 @@
-from alignment_free_graph_genotyper.chain_genotyper import read_kmers
+from kage.chain_genotyper import read_kmers
 import pyximport; pyximport.install(language_level=3)
 from graph_kmer_index.cython_kmer_index import get_nodes_and_ref_offsets_from_multiple_kmers
 from graph_kmer_index import KmerIndex

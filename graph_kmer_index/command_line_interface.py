@@ -18,7 +18,7 @@ from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
 from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
-from alignment_free_graph_genotyper.variants import VcfVariants
+from kage.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
 from graph_kmer_index.shared_mem import to_shared_memory, from_shared_memory, remove_shared_memory_in_session
 from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
