@@ -99,7 +99,7 @@ class UniqueVariantKmersFinder:
                     logging.warning("Found kmers for variant %s with ref/variant nodes %d/%d but flat kmers does not contain ref node. Flat kmer nodes: %s. Searched from possition %d" % (variant, ref_node, variant_node, flat._nodes, possible_ref_position))
                     #raise Exception("No kmers found")
 
-                if variant_node not in flat._nodes:
+                if False and variant_node not in flat._nodes:
                     logging.warning("No variant node kmers found for variant %s" % variant)
                     logging.warning("Found no variant node kmers for variant %s. Hashes: %s, ref positions: %s. Searched from ref position %d" % (variant, flat._hashes, flat._ref_offsets, possible_ref_position))
                     #raise Exception("No kmers found")

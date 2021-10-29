@@ -8,7 +8,10 @@ class SingleSharedArray:
     def __init__(self, array=None):
         self.array = array
 
+SHARED_MEMORIES_IN_SESSION = []
+
 def to_shared_memory(object, name):
+    global SHARED_MEMORIES_IN_SESSION
     logging.debug("Writing to shared memory %s" % name)
     meta_information = {}
     for property_name in object.properties:
@@ -27,13 +30,15 @@ def to_shared_memory(object, name):
 
         # Make shared memory and copy data to buffer
         #logging.info("Field %s has shape %s and type %s" % (property_name, data_shape, data_type))
+        array_name = name + "__" + property_name
         try:
-            sa.delete(name + "__" + property_name)
+            sa.delete(array_name)
         except FileNotFoundError:
             logging.debug("No existing shared memory, can create new one")
 
-        shared_array = sa.create(name + "__" + property_name, data_shape, data_type)
+        shared_array = sa.create(array_name, data_shape, data_type)
         shared_array[:] = data
+        SHARED_MEMORIES_IN_SESSION.append(array_name)
 
     f = open(name + "_meta.shm", "wb")
     pickle.dump(meta_information, f)
@@ -71,7 +76,13 @@ def remove_shared_memory(name):
     logging.warning("Available shared memories: %s" % available)
 
 
-
+def remove_shared_memory_in_session():
+    for name in SHARED_MEMORIES_IN_SESSION:
+        try:
+            sa.delete(name)
+            logging.info("Deleting shared memory %s" % name)
+        except FileNotFoundError:
+            logging.warning("Tried to deleted shared memory that did not exist")
 
 def remove_all_shared_memory():
     for shared in sa.list():

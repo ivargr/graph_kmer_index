@@ -20,7 +20,7 @@ from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
 from alignment_free_graph_genotyper.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
-from graph_kmer_index.shared_mem import to_shared_memory, from_shared_memory
+from graph_kmer_index.shared_mem import to_shared_memory, from_shared_memory, remove_shared_memory_in_session
 from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
 from obgraph.haplotype_matrix import HaplotypeMatrix
 
@@ -45,7 +45,14 @@ def create_index_single_thread(args, interval=None):
         graph = None
         assert args.reference_fasta is not None
         assert args.reference_name is not None, "Reference name must be specified"
-        reference = Fasta(args.reference_fasta)[args.reference_name]
+        logging.info("Reference name is *%s*" % args.reference_name)
+        try:
+            fasta = Fasta(args.reference_fasta)
+            logging.info("Names in fasta: %s" % str(fasta.keys()))
+            reference = fasta[args.reference_name]
+        except KeyError:
+            logging.error("Did not find reference name %s in %s" % (args.reference_name, args.reference_fasta))
+            raise
 
     logging.info("Running kmerfinder")
     whitelist = None
@@ -367,4 +374,5 @@ def run_argument_parser(args):
 
     args = parser.parse_args(args)
     args.func(args)
+    remove_shared_memory_in_session()
 
