@@ -14,7 +14,7 @@ class FlatKmers:
 
         if allele_frequencies is None:
             logging.info("Allele frequencies not provided. Setting all to 1.0")
-            self._allele_frequencies = np.zeros(len(self._nodes), dtype=np.single) + 1.0
+            self._allele_frequencies = np.zeros(len(self._hashes), dtype=np.single) + 1.0
         else:
             self._allele_frequencies = allele_frequencies
 
