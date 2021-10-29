@@ -12,10 +12,10 @@ def test():
     hash = sequence_to_kmer_hash(sequence)
     print(hash)
     sequence2 = kmer_hash_to_sequence(hash, len(sequence))
-    print(sequence2)
+    print(sequence, sequence2, hash, sequence_to_kmer_hash(sequence2))
 
 
     # todo:
-    #assert sequence2 == sequence, "%s != %s" % (sequence2, sequence)
+    assert sequence2 == sequence, "%s != %s" % (sequence2, sequence)
 
 test()

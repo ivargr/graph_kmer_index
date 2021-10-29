@@ -11,11 +11,13 @@ from collections import defaultdict
 
 
 def kmer_hash_to_sequence(hash, k):
+    hash = np.uint64(hash)
     bases = []
     for i in range(k):
         #print("Hash now: %d" % hash)
-        exponential = np.power(np.uint64(4), np.uint64(k-i-1))
-        base = hash // exponential
+        exponential = np.power(np.uint64(4), np.uint64(k-i-1), dtype=np.uint64)
+        #base = hash // exponential   # gives float, no good
+        base = np.floor_divide(hash, exponential, dtype=np.uint64)
         hash -= base * exponential
 
         if base == 0:
