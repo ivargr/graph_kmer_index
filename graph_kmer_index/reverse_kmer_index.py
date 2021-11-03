@@ -29,7 +29,12 @@ class ReverseKmerIndex:
         return self.hashes[index_position:index_position+n_hashes]
 
     def get_node_kmers_and_ref_positions(self, node):
-        index_position = int(self.nodes_to_index_positions[node])
+        try:
+            index_position = int(self.nodes_to_index_positions[node])
+        except IndexError:
+            logging.error("Invalid node %d" % node)
+            raise
+
         n_hashes = int(self.nodes_to_n_hashes[node])
         if n_hashes == 0:
             return [[], []]

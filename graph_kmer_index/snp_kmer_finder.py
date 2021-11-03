@@ -335,6 +335,7 @@ class SnpKmerFinder:
         #assert self.spacing == 1, "Finding kmers on linear reference is only possible when spacing is 1"
         logging.info("Fetching reference sequence between %d and %d" % (self._start_position, self._end_position+self.k))
         reference_sequence = str(self.reference[self._start_position:self._end_position+self.k])
+        assert len(reference_sequence) > 0
         logging.info("Fetching kmers")
         from .read_kmers import ReadKmers
         kmers = ReadKmers.get_kmers_from_read_dynamic(reference_sequence, np.power(4, np.arange(0, self.k)))

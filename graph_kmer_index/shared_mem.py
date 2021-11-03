@@ -80,11 +80,9 @@ def remove_shared_memory_in_session():
     for name in SHARED_MEMORIES_IN_SESSION:
         try:
             sa.delete(name)
-            logging.info("Deleting shared memory %s" % name)
         except FileNotFoundError:
             logging.warning("Tried to deleted shared memory that did not exist")
 
 def remove_all_shared_memory():
     for shared in sa.list():
-        logging.info("Deleting %s" % shared.name.decode("utf-8"))
         sa.delete(shared.name.decode("utf-8"))
