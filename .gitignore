@@ -15,4 +15,6 @@ tests/*.critical_nodes
 tests/*.nobg*
 tests/*.interval
 __pycache__
-
+*.so
+*.shm
+build/
