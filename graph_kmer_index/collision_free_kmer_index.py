@@ -35,6 +35,9 @@ class CollisionFreeKmerIndex:
     def set_allele_frequencies(self, frequencies):
         pass
 
+    def max_node_id(self):
+        return np.max(self._nodes)
+
     def set_frequencies_using_other_index(self, other, multiplier=1, min_frequency=1):
         unique = np.unique(self._kmers)
         for i, kmer in enumerate(unique):
@@ -116,7 +119,7 @@ class CollisionFreeKmerIndex:
         if nodes is None:
             f = 0
         else:
-            f = frequencies[0]
+            f = int(frequencies[0])  # convert to avoid overflow error
 
         if include_reverse_complement:
             sequence = kmer_hash_to_sequence(kmer, k)
@@ -125,7 +128,7 @@ class CollisionFreeKmerIndex:
             nodes, ref_offsets, frequencies, allele_frequencies = self.get(rev_kmer, max_hits=1000000000000000)
 
             if nodes is not None:
-                f += frequencies[0]
+                f += int(frequencies[0])
 
         return f
 
@@ -216,7 +219,12 @@ class CollisionFreeKmerIndex:
         # Find positions where hashes change (these are our index entries)
         diffs = np.ediff1d(hashes, to_begin=1)
         unique_entry_positions = np.nonzero(diffs)[0]
-        unique_hashes = hashes[unique_entry_positions]
+        try:
+            unique_hashes = hashes[unique_entry_positions]
+        except IndexError:
+            logging.info("unique entry positions: %s" % unique_entry_positions)
+            logging.info("Hashes: %s" % hashes)
+            raise
 
         lookup = np.zeros(modulo, dtype=np.int)
         lookup[unique_hashes] = unique_entry_positions

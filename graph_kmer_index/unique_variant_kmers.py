@@ -40,7 +40,8 @@ class UniqueVariantKmersFinder:
     def find_unique_kmers_over_variant(self, variant, ref_node, variant_node):
         is_valid = False
         has_added = False
-        # Start searching from before. The last position is probably the best for indels, since the sequence after is offset-ed. We want to end on this, because this is what is chosen if all else fails
+        # Start searching from before. The last position is probably the best for indels, since the sequence after is offset-ed.
+        # We want to end on this, because this is what is chosen if all else fails
         possible_ref_positions = [variant.position - i for i in range(1, self.k - 2)][::-1]
         valid_positions_found = []
 
@@ -81,6 +82,7 @@ class UniqueVariantKmersFinder:
             # if we are at last position (then choose this anyway, better than nothing)
             if possible_ref_position == possible_ref_positions[-1]:
                 is_valid = True
+                #is_valid = False  # testing this
 
             if is_valid:
                 # Kmers are valid, we don't need to search anymore for this variant
@@ -102,8 +104,6 @@ class UniqueVariantKmersFinder:
                 if variant_node not in flat._nodes:
                     logging.warning("No variant node kmers found for variant %s with variant node %d and ref node %d" % (variant, variant_node, ref_node))
                     logging.warning("Found no variant node kmers for variant %s. Hashes: %s, ref positions: %s. Searched from ref position %d" % (variant, flat._hashes, flat._ref_offsets, possible_ref_position))
-                    if variant_node == 5980:
-                        raise Exception("No kmers found")
 
         # Sort positions by max kmer frequency
         if len(valid_positions_found) == 0:

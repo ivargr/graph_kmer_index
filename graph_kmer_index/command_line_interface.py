@@ -18,7 +18,7 @@ from .reverse_kmer_index import ReverseKmerIndex
 from .unique_kmer_index import UniqueKmerIndex
 from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
-from kage.variants import VcfVariants
+from obgraph.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
 from graph_kmer_index.shared_mem import to_shared_memory, from_shared_memory, remove_shared_memory_in_session
 from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
@@ -39,7 +39,7 @@ def create_index_single_thread(args, interval=None):
     logging.info("Loading data")
     #graph = Graph.from_file(args.graph_file_name)
     if args.graph_file_name is not None:
-        graph = from_shared_memory(Graph, "graph_shared")
+        graph = from_shared_memory(Graph, "graph_shared"+args.shared_memory_unique_id)
         reference = None
     else:
         graph = None
@@ -84,9 +84,12 @@ def create_index_single_thread(args, interval=None):
     return kmers
 
 def create_index(args):
+    args.shared_memory_unique_id = str(np.random.randint(0, 10e15))
+    r = args.shared_memory_unique_id
+
     if args.graph_file_name is not None:
         graph = Graph.from_file(args.graph_file_name)
-        to_shared_memory(graph, "graph_shared")
+        to_shared_memory(graph, "graph_shared"+r)
 
     if args.threads == 1:
         kmers = create_index_single_thread(args)
@@ -255,9 +258,10 @@ def run_argument_parser(args):
     subparser.set_defaults(func=make_reference_kmer_index)
 
     def make_unique_variant_kmers_single_thread(variants, args):
-        variant_to_nodes = from_shared_memory(VariantToNodes, "variant_to_nodes_shared")
-        kmer_index = from_shared_memory(CollisionFreeKmerIndex, "kmer_index_shared")
-        graph = from_shared_memory(Graph, "graph_shared")
+        r = args.shared_memory_unique_id
+        variant_to_nodes = from_shared_memory(VariantToNodes, "variant_to_nodes_shared"+r)
+        kmer_index = from_shared_memory(CollisionFreeKmerIndex, "kmer_index_shared"+r)
+        graph = from_shared_memory(Graph, "graph_shared"+r)
         #graph = Graph.from_file(args.graph)
         logging.info("Reading all variants")
 
@@ -275,15 +279,17 @@ def run_argument_parser(args):
         return flat_kmers
 
     def make_unique_variant_kmers(args):
+        args.shared_memory_unique_id = str(np.random.randint(0,10e15))
+        r = args.shared_memory_unique_id
         logging.info("Reading kmer index")
         kmer_index = CollisionFreeKmerIndex.from_file(args.kmer_index)
-        to_shared_memory(kmer_index, "kmer_index_shared")
+        to_shared_memory(kmer_index, "kmer_index_shared"+r)
         logging.info("Reading variant to nodes")
         variant_to_nodes = VariantToNodes.from_file(args.variant_to_nodes)
-        to_shared_memory(variant_to_nodes, "variant_to_nodes_shared")
+        to_shared_memory(variant_to_nodes, "variant_to_nodes_shared"+r)
         logging.info("REading graph")
         graph = Graph.from_file(args.graph)
-        to_shared_memory(graph, "graph_shared")
+        to_shared_memory(graph, "graph_shared"+r)
         logging.info("Reading all variants")
         variants = VcfVariants.from_vcf(args.vcf, skip_index=True, make_generator=True)
         variants = variants.get_chunks(chunk_size=args.chunk_size)

@@ -5,6 +5,7 @@ from collections import defaultdict
 
 class FlatKmers:
     def __init__(self, hashes, nodes, ref_offsets=None, allele_frequencies=None):
+        assert len(hashes) == len(nodes)
         self._hashes = hashes
         self._nodes = nodes
         if ref_offsets is None:

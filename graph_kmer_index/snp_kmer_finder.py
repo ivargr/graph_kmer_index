@@ -360,7 +360,7 @@ class SnpKmerFinder:
         prev_time = time.time()
         for i in range(self._start_position // self.spacing, self.graph.linear_ref_length() // self.spacing):
             pos = i * self.spacing
-            if i % 10000 == 0:
+            if i % 50000 == 0:
 
                 logging.info("On ref position %d/%s. Time spent: %.3f. %d/%d basepairs traversed. %d kmers found. Have pruned %d kmers. "
                              "Skipped %d kmers. Skipped due to high frequency: %d. Skipped because too many variant nodes: %d. Skipped because blacklisted node: %d. Skipped low allele freq: %d"
