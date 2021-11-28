@@ -146,7 +146,6 @@ def run_numpy_based_function_in_parallel(function, n_threads, arguments):
     new_arguments = []
 
     # Put np arrays in shared memory, everything else we keep as is
-    logging.info("Putting all arrays in shared memory")
     array_length = 0
     for argument in arguments:
         if isinstance(argument, np.ndarray):
