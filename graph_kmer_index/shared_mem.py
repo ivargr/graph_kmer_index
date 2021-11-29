@@ -172,7 +172,7 @@ def run_numpy_based_function_in_parallel(function, n_threads, arguments):
 
     t = time.perf_counter()
     results = np.concatenate(results)
-    logging.info("Time to concatenate results: %.3f" % (time.perf_counter()-t))
+    logging.debug("Time to concatenate results: %.3f" % (time.perf_counter()-t))
     return results
 
 

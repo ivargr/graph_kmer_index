@@ -5,7 +5,6 @@ import time
 logging.basicConfig(level=logging.INFO)
 import numpy as np
 from .flat_kmers import FlatKmers, letter_sequence_to_numeric
-from numba import jit
 from Bio.Seq import Seq
 from collections import defaultdict
 

@@ -4,12 +4,21 @@ from pyfaidx import Fasta
 import numba
 from .read_kmers import ReadKmers
 
+"""
 @numba.jit
 def fill_zeros_from_end(array):
     for i in range(1, len(array)):
         index_pos = len(array) - i
         if array[index_pos] == 0:
             array[index_pos] = array[index_pos+1]
+"""
+
+def fill_zeros_from_end(array):
+    array = array[::-1]
+    prev = np.arange(len(array))
+    prev[array == 0] = 0
+    prev = np.maximum.accumulate(prev)
+    return array[prev][::-1]
 
 
 class ReferenceKmerIndex:
@@ -100,7 +109,7 @@ class ReferenceKmerIndex:
         logging.info("Filled %d zeros" % n_corrected)
         """
         logging.info("Filling zeroes")
-        fill_zeros_from_end(ref_position_to_index)
+        ref_position_to_index = fill_zeros_from_end(ref_position_to_index)
 
         return cls(ref_position_to_index, kmers, ref_positions, nodes)
 
