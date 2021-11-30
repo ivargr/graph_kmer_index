@@ -1,7 +1,6 @@
 import logging
 import numpy as np
 from pyfaidx import Fasta
-import numba
 from .read_kmers import ReadKmers
 
 """
