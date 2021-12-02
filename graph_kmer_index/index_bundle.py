@@ -2,9 +2,6 @@ import logging
 import numpy as np
 from obgraph.variant_to_nodes import VariantToNodes
 from obgraph.numpy_variants import NumpyVariants
-from .node_count_model import NodeCountModelAdvanced
-from .helper_index import HelperVariants, CombinationMatrix
-from .tricky_variants import TrickyVariants
 from graph_kmer_index import KmerIndex
 
 # Wrapper for all indexes required by kage genotyping
@@ -15,6 +12,9 @@ class IndexBundle:
 
     @classmethod
     def from_file(cls, file_name):
+        from kage.node_count_model import NodeCountModelAdvanced
+        from kage.helper_index import HelperVariants, CombinationMatrix
+        from kage.tricky_variants import TrickyVariants
         data = np.load(file_name)
         data_keys = list(data.keys())
 
@@ -36,6 +36,9 @@ class IndexBundle:
         return cls(indexes)
 
     def to_file(self, file_name):
+        from kage.node_count_model import NodeCountModelAdvanced
+        from kage.helper_index import HelperVariants, CombinationMatrix
+        from kage.tricky_variants import TrickyVariants
         archive = {}
         for index_name, object in self.indexes.items():
             for property in eval(index_name).properties:
