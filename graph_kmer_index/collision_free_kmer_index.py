@@ -17,20 +17,21 @@ class CollisionFreeKmerIndex:
             "_allele_frequencies"
         }
 
-    def __init__(self, hashes_to_index=None, n_kmers=None, nodes=None, ref_offsets=None, kmers=None, modulo=452930477, frequencies=None, allele_frequencies=None):
-        self._hashes_to_index = hashes_to_index
-        self._n_kmers = n_kmers
-        self._nodes = nodes
-        self._ref_offsets = ref_offsets
-        self._kmers = kmers  # Actual numeric kmers (not hashes of numeric kmers) at each position
+    # ugly signature to support automatic reading from index bundle: TODO: Fix
+    def __init__(self, _hashes_to_index=None, _n_kmers=None, _nodes=None, _ref_offsets=None, _kmers=None, _modulo=452930477, _frequencies=None, _allele_frequencies=None):
+        self._hashes_to_index = _hashes_to_index
+        self._n_kmers = _n_kmers
+        self._nodes = _nodes
+        self._ref_offsets = _ref_offsets
+        self._kmers = _kmers  # Actual numeric kmers (not hashes of numeric kmers) at each position
                              # used to filter out collisions
-        self._modulo = modulo
-        if frequencies is None:
+        self._modulo = _modulo
+        if _frequencies is None:
             self._frequencies = 0
         else:
-            self._frequencies = frequencies
+            self._frequencies = _frequencies
 
-        self._allele_frequencies = allele_frequencies
+        self._allele_frequencies = _allele_frequencies
 
     def set_allele_frequencies(self, frequencies):
         pass
