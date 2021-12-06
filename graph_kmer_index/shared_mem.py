@@ -65,7 +65,7 @@ def to_shared_memory(object, name):
         shared_array[:] = data
         SHARED_MEMORIES_IN_SESSION.append(array_name)
 
-    f = open(name + "_meta.shm", "wb")
+    f = open("." + name + "_meta.shm", "wb")
     pickle.dump(meta_information, f)
     #logging.info("Done writing to shared memory. Took %.3f sec" % (time.perf_counter()-t))
     #logging.info("Wrote meta data to file")
@@ -75,7 +75,7 @@ def from_shared_memory(cls, name):
     object = cls()
     t = time.perf_counter()
     try:
-        meta_data = pickle.load(open(name + "_meta.shm", "rb"))
+        meta_data = pickle.load(open("." + name + "_meta.shm", "rb"))
     except EOFError:
         logging.error("Failed reading from %s._meta.shm" % name)
         raise

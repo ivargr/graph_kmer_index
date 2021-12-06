@@ -41,10 +41,12 @@ class IndexBundle:
         from kage.tricky_variants import TrickyVariants
         archive = {}
         for index_name, object in self.indexes.items():
+            logging.info("Packing index %s" % index_name)
             for property in eval(index_name).properties:
                 archive_name = index_name + "." + property
                 archive[archive_name] = getattr(object, property)
 
+        logging.info("Saving to compressed file %s" % file_name)
         np.savez_compressed(file_name, **archive)
 
 
