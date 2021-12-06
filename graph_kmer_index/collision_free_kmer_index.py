@@ -234,7 +234,7 @@ class CollisionFreeKmerIndex:
         n_kmers[unique_hashes] = n_entries
 
         # Find out how many entries there are for each unique hash
-        object = cls(lookup, n_kmers, nodes, ref_offsets, kmers, modulo, allele_frequencies=allele_frequencies)
+        object = cls(lookup, n_kmers, nodes, ref_offsets, kmers, modulo, _allele_frequencies=allele_frequencies)
         object.set_frequencies(skip_frequencies)
 
         if skip_singletons:
