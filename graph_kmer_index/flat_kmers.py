@@ -93,6 +93,10 @@ class FlatKmers:
         logging.info("Returning new flat kmers")
         return FlatKmers(new_hashes, new_nodes, new_ref_offsets, new_allele_frequencies)
 
+    def get_revers_complement_flat_kmers(self):
+        # returns a new FlatKmers object where every kmer is the reverse complement
+        pass
+
 
 def letter_sequence_to_numeric(sequence):
     if not isinstance(sequence, np.ndarray):

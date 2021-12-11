@@ -1,5 +1,8 @@
 from graph_kmer_index import sequence_to_kmer_hash, letter_sequence_to_numeric, kmer_hash_to_sequence
 import numpy as np
+from graph_kmer_index.kmer_hashing import kmer_hash_to_reverse_complement_hash, kmer_hashes_to_reverse_complement_hash
+from graph_kmer_index import ReadKmers
+from Bio.Seq import Seq
 
 
 def test():
@@ -36,3 +39,37 @@ def test_hash_and_reverse():
 
     # todo:
     assert sequence2 == sequence, "%s != %s" % (sequence2, sequence)
+
+
+def test_rev_comp_hash():
+    sequences = ["AcATaCAG",
+                 "AGACATTA",
+                 "GGGGAAAACCCCTTTTAAAACCCCTTTTGGG",
+                 "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                 "ACT"]
+
+    for seq in sequences:
+        k = len(seq)
+        hash = sequence_to_kmer_hash(seq)
+        rev_comp_hash = kmer_hash_to_reverse_complement_hash(hash, k)
+        back_to_original_hash = kmer_hash_to_reverse_complement_hash(rev_comp_hash, k)
+        assert hash == back_to_original_hash
+        assert kmer_hash_to_sequence(rev_comp_hash, k).lower() == str(Seq(seq).reverse_complement()).lower()
+
+
+def test_rev_comp_hashes():
+    sequences = ["ACACTTACG",
+                 "acgactaca",
+                 "AATTGGGGG",
+                 "ACACACACT"]
+    k = len(sequences[0])
+    hashes = np.array([sequence_to_kmer_hash(sequence) for sequence in sequences])
+    reverse_complement = kmer_hashes_to_reverse_complement_hash(hashes, k)
+    back = kmer_hashes_to_reverse_complement_hash(reverse_complement, k)
+    assert np.all(back == hashes)
+
+
+
+
+test_rev_comp_hash()
+test_rev_comp_hashes()

@@ -1,9 +1,75 @@
+import time
 import numpy as np
 import logging
 import pickle
 
 from graph_kmer_index import kmer_hash_to_sequence, sequence_to_kmer_hash
 from Bio.Seq import Seq
+
+
+class MinimalKmerIndex:
+    def __init__(self, hashes_to_index, n_kmers, nodes, kmers, modulo):
+        self._hashes_to_index = hashes_to_index.astype(np.int64)
+        self._n_kmers = n_kmers.astype(np.uint32)
+        self._nodes = nodes.astype(np.uint32)
+        self._kmers = kmers
+        self._modulo = modulo
+
+    def max_node_id(self):
+        return np.max(self._nodes)
+
+    def to_file(self, file_name):
+        logging.info("Writing kmer index to file: %s" % file_name)
+        np.savez(file_name, hashes_to_index=self._hashes_to_index,
+                 n_kmers=self._n_kmers,
+                 nodes=self._nodes,
+                 kmers=self._kmers,
+                 modulo=self._modulo)
+
+    @classmethod
+    def from_file(cls, file_name):
+        t = time.perf_counter()
+        try:
+            data = np.load(file_name + ".npz")
+        except FileNotFoundError:
+            data = np.load(file_name)
+
+        logging.info("Took %.6f sec to read kmer index from file" % (time.perf_counter()-t))
+        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["kmers"], data["modulo"])
+
+    @classmethod
+    def from_flat_kmers(cls, flat_kmers, modulo=452930477):
+        kmers = flat_kmers._hashes
+        nodes = flat_kmers._nodes
+        logging.info("Making hashes")
+        hashes = kmers % modulo
+        logging.info("Sorting")
+        sorting = np.argsort(hashes)
+        hashes = hashes[sorting]
+        kmers = kmers[sorting]
+        nodes = nodes[sorting]
+        logging.info("Done sorting")
+
+        # Find positions where hashes change (these are our index entries)
+        diffs = np.ediff1d(hashes, to_begin=1)
+        unique_entry_positions = np.nonzero(diffs)[0]
+        try:
+            unique_hashes = hashes[unique_entry_positions]
+        except IndexError:
+            logging.info("unique entry positions: %s" % unique_entry_positions)
+            logging.info("Hashes: %s" % hashes)
+            raise
+
+        lookup = np.zeros(modulo, dtype=np.int)
+        lookup[unique_hashes] = unique_entry_positions
+        n_entries = np.ediff1d(unique_entry_positions, to_end=len(nodes) - unique_entry_positions[-1])
+        n_kmers = np.zeros(modulo, dtype=np.uint32)
+        n_kmers[unique_hashes] = n_entries
+
+        # Find out how many entries there are for each unique hash
+        object = cls(lookup, n_kmers, nodes, kmers, modulo)
+        return object
+
 
 class CollisionFreeKmerIndex:
     properties = {
@@ -32,6 +98,17 @@ class CollisionFreeKmerIndex:
             self._frequencies = _frequencies
 
         self._allele_frequencies = _allele_frequencies
+
+    def copy(self):
+        return CollisionFreeKmerIndex(self._hashes_to_index.copy(),
+                                      self._n_kmers.copy(),
+                                      self._nodes.copy(),
+                                      self._ref_offsets.copy(),
+                                      self._kmers.copy(),
+                                      self._modulo.copy(),
+                                      self._frequencies.copy(),
+                                      self._allele_frequencies.copy()
+                                      )
 
     def set_allele_frequencies(self, frequencies):
         pass
