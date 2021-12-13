@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from collections import defaultdict
+from .kmer_hashing import kmer_hashes_to_reverse_complement_hash
 
 
 class FlatKmers:
@@ -93,9 +94,11 @@ class FlatKmers:
         logging.info("Returning new flat kmers")
         return FlatKmers(new_hashes, new_nodes, new_ref_offsets, new_allele_frequencies)
 
-    def get_revers_complement_flat_kmers(self):
-        # returns a new FlatKmers object where every kmer is the reverse complement
-        pass
+    def get_reverse_complement_flat_kmers(self, k):
+        return FlatKmers(kmer_hashes_to_reverse_complement_hash(self._hashes, k),
+                         self._nodes,
+                         self._ref_offsets,
+                         self._allele_frequencies)
 
 
 def letter_sequence_to_numeric(sequence):

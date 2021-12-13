@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 
 
@@ -12,6 +13,7 @@ def kmer_hashes_to_reverse_complement_hash(hashes, k):
     hashes = hashes.astype(np.uint64)
     bases = np.zeros((len(hashes), k), dtype=np.uint64)
     for i in range(k):
+        logging.info("Finding hashes. k=%d/%d" % (i, k))
         # print("Hash now: %d" % hash)
         exponential = np.power(np.uint64(4), np.uint64(k - i - 1), dtype=np.uint64)
         # base = hash // exponential   # gives float, no good

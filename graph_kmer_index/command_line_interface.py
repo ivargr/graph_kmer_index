@@ -132,6 +132,14 @@ def create_index(args):
 
 def make_from_flat(args):
     flat = FlatKmers.from_file(args.flat_index)
+
+    if args.add_reverse_complements:
+        logging.info("Will add reverse complements of every hash. Getting reverse complements.")
+        logging.info("NB: Using k=%d when computing reverse complements" % args.kmer_size)
+        rev_comp_flat = flat.get_reverse_complement_flat_kmers(k=args.kmer_size)
+        flat = FlatKmers.from_multiple_flat_kmers([flat, rev_comp_flat])
+        logging.info("Made new flat kmers with rev comp, now making index")
+
     if args.make_minimal:
         logging.info("Making minimal kmer index")
         from .collision_free_kmer_index import MinimalKmerIndex
@@ -240,6 +248,8 @@ def run_argument_parser(args):
     subparser.add_argument("-S", "--skip-frequencies", type=bool, default=False, required=False)
     subparser.add_argument("-s", "--skip-singletons", type=bool, default=False, required=False)
     subparser.add_argument("-M", "--make-minimal", type=bool, default=False, required=False)
+    subparser.add_argument("-r", "--add-reverse-complements", type=bool, default=False, required=False, help="If True, the rev. comp. of every kmer hash will also be added")
+    subparser.add_argument("-k", "--kmer-size", type=int, default=31, required=False, help="Only required when --add-reverse-complements=True. Used to compute rev comp hashes.")
     subparser.set_defaults(func=make_from_flat)
 
     subparser = subparsers.add_parser("make_reverse")
