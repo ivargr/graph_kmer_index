@@ -11,7 +11,7 @@ class IndexBundle:
         self.indexes = indexes
 
     @classmethod
-    def from_file(cls, file_name):
+    def from_file(cls, file_name, skip=None):
         from kage.node_count_model import NodeCountModelAdvanced
         from kage.helper_index import HelperVariants, CombinationMatrix
         from kage.tricky_variants import TrickyVariants
@@ -20,6 +20,8 @@ class IndexBundle:
 
         indexes = {}
         for index in cls.index_names:
+            if skip is not None and index in skip:
+                logging.info("Not reading %s from index bundle" % index)
             property_data = {}
             properties = eval(index).properties
             for property in properties:
