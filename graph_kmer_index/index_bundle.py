@@ -20,8 +20,10 @@ class IndexBundle:
 
         indexes = {}
         for index in cls.index_names:
+            logging.info("Reading %s from index bundle" % index)
             if skip is not None and index in skip:
                 logging.info("Not reading %s from index bundle" % index)
+                continue
             property_data = {}
             properties = eval(index).properties
             for property in properties:
@@ -34,10 +36,11 @@ class IndexBundle:
 
             index_object = eval(index)(**property_data)
             indexes[index] = index_object
+            logging.info("Done reading %s from index bundle" % index)
 
         return cls(indexes)
 
-    def to_file(self, file_name):
+    def to_file(self, file_name, compress=True):
         from kage.node_count_model import NodeCountModelAdvanced
         from kage.helper_index import HelperVariants, CombinationMatrix
         from kage.tricky_variants import TrickyVariants
@@ -48,7 +51,11 @@ class IndexBundle:
                 archive_name = index_name + "." + property
                 archive[archive_name] = getattr(object, property)
 
-        logging.info("Saving to compressed file %s" % file_name)
-        np.savez_compressed(file_name, **archive)
+        if compress:
+            logging.info("Saving to compressed file %s" % file_name)
+            np.savez_compressed(file_name, **archive)
+        else:
+            logging.info("Saving to uncompressed file %s" % file_name)
+            np.savez(file_name, **archive)
 
 
