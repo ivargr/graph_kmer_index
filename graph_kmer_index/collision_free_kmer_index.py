@@ -2,6 +2,7 @@ import time
 import numpy as np
 import logging
 import pickle
+import gc
 
 from graph_kmer_index import kmer_hash_to_sequence, sequence_to_kmer_hash
 from Bio.Seq import Seq
@@ -36,6 +37,7 @@ class MinimalKmerIndex:
 
         logging.info("Took %.6f sec to read kmer index from file" % (time.perf_counter()-t))
         return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["kmers"], data["modulo"])
+
 
     @classmethod
     def from_flat_kmers(cls, flat_kmers, modulo=452930477):
@@ -98,6 +100,14 @@ class CollisionFreeKmerIndex:
             self._frequencies = _frequencies
 
         self._allele_frequencies = _allele_frequencies
+
+    def clear(self):
+        self._hashes_to_index = None
+        self._n_kmers = None
+        self._nodes = None
+        self._kmers = None
+        self._modulo = None
+        gc.collect()
 
     def copy(self):
         return CollisionFreeKmerIndex(self._hashes_to_index.copy(),
