@@ -126,6 +126,15 @@ class CollisionFreeKmerIndex:
     def max_node_id(self):
         return np.max(self._nodes)
 
+    def convert_to_int32(self):
+        self._hashes_to_index = self._hashes_to_index.astype(np.int32)
+        self._nodes = self._nodes.astype(np.int32)
+        self._n_kmers = self._n_kmers.astype(np.int32)
+        self._modulo = np.uint64(self._modulo)
+
+    def remove_ref_offsets(self):
+        self._ref_offsets = np.array([0])
+
     def set_frequencies_using_other_index(self, other, multiplier=1, min_frequency=1):
         unique = np.unique(self._kmers)
         for i, kmer in enumerate(unique):
