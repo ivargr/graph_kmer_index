@@ -4,6 +4,39 @@ from collections import defaultdict
 from .kmer_hashing import kmer_hashes_to_reverse_complement_hash
 
 
+class FlatKmers2:
+    def __init__(self, hashes, start_nodes, start_offsets, nodes, allele_frequencies):
+        assert len(hashes) == len(nodes)
+        assert len(start_nodes) == len(nodes)
+        assert len(start_offsets) == len(start_nodes)
+
+        self._hashes = hashes
+        self._nodes = nodes
+        self._start_nodes = start_nodes
+        self._start_offsets = start_offsets
+
+        if allele_frequencies is None:
+            logging.info("Allele frequencies not provided. Setting all to 1.0")
+            self._allele_frequencies = np.zeros(len(self._hashes), dtype=np.single) + 1.0
+        else:
+            self._allele_frequencies = allele_frequencies
+
+    @classmethod
+    def from_file(cls, file_name):
+        try:
+            data = np.load(file_name)
+        except FileNotFoundError:
+            data = np.load(file_name + ".npz")
+
+        logging.info("Loaded kmers from %s" % file_name)
+        return cls(data["hashes"], data["nodes"], data["start_nodes"], data["start_offsets"], data["allele_frequencies"])
+
+    def to_file(self, file_name):
+        np.savez(file_name, hashes=self._hashes, nodes=self._nodes, start_nodes=self._start_nodes, start_offsets=self._start_offsets,
+                 allele_frequencies=self._allele_frequencies)
+        logging.info("Saved to %s.npz" % file_name)
+
+
 class FlatKmers:
     def __init__(self, hashes, nodes, ref_offsets=None, allele_frequencies=None):
         assert len(hashes) == len(nodes)

@@ -1,5 +1,6 @@
 import logging
 from graph_kmer_index.kmer_finder import DenseKmerFinder
+from graph_kmer_index import KmerIndex2
 from obgraph import Graph
 logging.basicConfig(level=logging.INFO)
 
@@ -16,6 +17,11 @@ def simple_test():
     print(graph.numeric_node_sequences)
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
+    flat = finder.get_flat_kmers()
+
+    index = KmerIndex2.from_flat_kmers(flat)
+
+    print(index)
 
     print(finder.results)
 

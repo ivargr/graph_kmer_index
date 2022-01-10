@@ -73,6 +73,96 @@ class MinimalKmerIndex:
         return object
 
 
+
+class KmerIndex2:
+    # same as CollisionFreeKmerIndex, but with startnode/offset in stead of ref_offset
+    def __init__(self, hashes_to_index, n_kmers, nodes, start_nodes, start_offsets, kmers, modulo=452930477, frequencies=None, allele_frequencies=None):
+        self._hashes_to_index = hashes_to_index
+        self._n_kmers = n_kmers
+        self._nodes = nodes
+        self._start_nodes = start_nodes
+        self._start_offsets = start_offsets
+        self._kmers = kmers
+        self._modulo = modulo
+        self._frequencies = frequencies
+        self._allele_frequencies = allele_frequencies
+
+    def to_file(self, file_name):
+        logging.info("Writing kmer index to file: %s" % file_name)
+        np.savez(file_name, hashes_to_index=self._hashes_to_index,
+                 n_kmers=self._n_kmers,
+                 nodes=self._nodes,
+                 start_nodes=self._start_nodes,
+                 start_offsets=self._start_offsets,
+                 kmers=self._kmers,
+                 modulo=self._modulo,
+                 frequencies=self._frequencies,
+                 allele_frequencies=self._allele_frequencies)
+
+    @classmethod
+    def from_file(cls, file_name):
+        try:
+            data = np.load(file_name + ".npz")
+        except FileNotFoundError:
+            data = np.load(file_name)
+
+        if "allele_frequencies" in data:
+            allele_frequencies = data["allele_frequencies"]
+        else:
+            allele_frequencies = np.zeros(len(data["ref_offsets"]))
+
+        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["start_nodes"], data["start_offsets"], data["kmers"], data["modulo"], data["frequencies"], allele_frequencies)
+
+    @classmethod
+    def from_flat_kmers(cls, flat_kmers, modulo=452930477, skip_frequencies=False, skip_singletons=False):
+        if skip_singletons:
+            flat_kmers = flat_kmers.get_new_without_singletons()
+
+        kmers = flat_kmers._hashes
+        nodes = flat_kmers._nodes
+        start_nodes = flat_kmers._start_nodes
+        start_offsets = flat_kmers._start_offsets
+
+        logging.info("Making hashes")
+        hashes = kmers % modulo
+        logging.info("Sorting")
+        sorting = np.argsort(hashes)
+        hashes = hashes[sorting]
+        kmers = kmers[sorting]
+        nodes = nodes[sorting]
+        start_nodes = start_nodes[sorting]
+        start_offsets = start_offsets[sorting]
+        allele_frequencies = flat_kmers._allele_frequencies[sorting]
+        logging.info("Done sorting")
+
+        # Find positions where hashes change (these are our index entries)
+        diffs = np.ediff1d(hashes, to_begin=1)
+        unique_entry_positions = np.nonzero(diffs)[0]
+        try:
+            unique_hashes = hashes[unique_entry_positions]
+        except IndexError:
+            logging.info("unique entry positions: %s" % unique_entry_positions)
+            logging.info("Hashes: %s" % hashes)
+            raise
+
+        lookup = np.zeros(modulo, dtype=np.int)
+        lookup[unique_hashes] = unique_entry_positions
+        n_entries = np.ediff1d(unique_entry_positions, to_end=len(nodes)-unique_entry_positions[-1])
+        n_kmers = np.zeros(modulo, dtype=np.uint32)
+        n_kmers[unique_hashes] = n_entries
+
+        # Find out how many entries there are for each unique hash
+        object = cls(lookup, n_kmers, nodes, start_nodes, start_offsets, kmers, modulo, allele_frequencies=allele_frequencies)
+        object.set_frequencies(skip_frequencies)
+
+        if skip_singletons:
+            logging.info("Adding 1 to all frequencies since singletons are skipped")
+            object._frequencies += 1
+
+        return object
+
+
+
 class CollisionFreeKmerIndex:
     properties = {
             "_hashes_to_index",
