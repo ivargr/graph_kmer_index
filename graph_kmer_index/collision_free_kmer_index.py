@@ -5,7 +5,23 @@ import pickle
 import gc
 
 from graph_kmer_index import kmer_hash_to_sequence, sequence_to_kmer_hash
+from npstructures import Counter
 from Bio.Seq import Seq
+
+
+class CounterKmerIndex:
+    def __init__(self, kmers, nodes, counter):
+        self.kmers = kmers
+        self.nodes = nodes
+        self.counter = counter
+
+    @classmethod
+    def from_kmer_index(cls, kmer_index, modulo):
+        kmers = kmer_index._kmers.astype(np.int64)
+        nodes = kmer_index._nodes
+        unique_kmers = np.unique(kmers)
+        counter = Counter(unique_kmers, np.zeros_like(unique_kmers), mod=modulo)
+        return cls(kmers, nodes, counter)
 
 
 class MinimalKmerIndex:
@@ -286,12 +302,16 @@ class CollisionFreeKmerIndex:
         except FileNotFoundError:
             data = np.load(file_name)
 
-        if "allele_frequencies" in data:
-            allele_frequencies = data["allele_frequencies"]
-        else:
-            allele_frequencies = np.zeros(len(data["ref_offsets"]))
+        try:
+            if "allele_frequencies" in data:
+                allele_frequencies = data["allele_frequencies"]
+            else:
+                allele_frequencies = np.zeros(len(data["ref_offsets"]))
 
-        return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"], allele_frequencies)
+            return cls(data["hashes_to_index"], data["n_kmers"], data["nodes"], data["ref_offsets"], data["kmers"], data["modulo"], data["frequencies"], allele_frequencies)
+        except AttributeError:
+            logging.info("Keys are %s" % (data.keys()))
+            raise
 
     @classmethod
     def from_flat_kmers(cls, flat_kmers, modulo=452930477, skip_frequencies=False, skip_singletons=False):

@@ -20,9 +20,11 @@ from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
 from obgraph.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
-from shared_memory_wrapper.shared_memory import to_shared_memory, from_shared_memory, remove_shared_memory_in_session
+from shared_memory_wrapper.shared_memory import to_shared_memory, from_shared_memory, remove_shared_memory_in_session, to_file, from_file
 from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
 from obgraph.haplotype_matrix import HaplotypeMatrix
+from npstructures import HashTable, Counter
+from .collision_free_kmer_index import CounterKmerIndex
 
 
 def main():
@@ -389,6 +391,19 @@ def run_argument_parser(args):
     subparser.add_argument("-i", "--kmer-index", required=True)
     subparser.add_argument("-f", "--frequencies", required=True)
     subparser.set_defaults(func=set_allele_frequencies)
+
+
+    def create_counter_index(args):
+        kmer_index = CollisionFreeKmerIndex.from_file(args.kmer_index)
+        counter_index = CounterKmerIndex.from_kmer_index(kmer_index, args.modulo)
+        to_file(counter_index, args.out_file_name)
+
+
+    subparser = subparsers.add_parser("create_counter_index")
+    subparser.add_argument("-i", "--kmer-index", required=True)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.add_argument("-m", "--modulo", required=False, default=200000033, type=int)
+    subparser.set_defaults(func=create_counter_index)
 
     if len(args) == 0:
         parser.print_help()
