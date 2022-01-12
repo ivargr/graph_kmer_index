@@ -25,6 +25,9 @@ def very_simple_test():
     assert np.all(index.get_start_offsets(sequence_to_kmer_hash("ATA")) == [0, 0, 0])
 
     assert set(index.get_nodes(sequence_to_kmer_hash("ACA"))) == set([0, 1, 3])
+
+    print(index.get_nodes(sequence_to_kmer_hash("AAA")))
+
     assert set(index.get_nodes(sequence_to_kmer_hash("AAA"))) == set([0, 3])
 
     assert len(index.get_all_kmers()) == 16
@@ -63,6 +66,7 @@ def test_nested_paths():
     flat = finder.get_flat_kmers()
     index = KmerIndex2.from_flat_kmers(flat)
     assert len(flat._hashes) == 41, len(flat._hashes)
+
 
 very_simple_test()
 simple_test()

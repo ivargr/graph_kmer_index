@@ -2,6 +2,8 @@ import logging
 import numpy as np
 from .flat_kmers import FlatKmers2
 from .critical_graph_paths import CriticalGraphPaths
+from npstructures.numpylist import NumpyList
+
 
 class DenseKmerFinder:
     """
@@ -23,9 +25,9 @@ class DenseKmerFinder:
         self._current_search_start_offset = 0
         self._current_hash = 0
         self._current_reverse_hash = 0
-        self._current_bases = []
-        self._current_nodes = []
-        self._allele_frequencies = []
+        self._current_bases = NumpyList()
+        self._current_nodes = NumpyList()
+        self._allele_frequencies = NumpyList()
 
         self.results = []
 
@@ -55,7 +57,8 @@ class DenseKmerFinder:
         # finds all critical nodes with length >= k in order to find suitable starting points for recursive searches
         pass
 
-    def _add_kmer(self, kmer, reverse_kmer, start_node, start_offset, nodes):
+    def _add_kmer(self, kmer, reverse_kmer, start_node, start_offset):
+        nodes = self._current_nodes[-self._k:]
         logging.info("Adding kmer %d at node/offset %d/%d with nodes %s. Start node/offset: %d/%d" %
                      (kmer, start_node, start_offset, nodes, start_node, start_offset))
         kmers = [kmer, reverse_kmer]
@@ -84,8 +87,7 @@ class DenseKmerFinder:
     def find(self):
         # iteratively calls search_from() on the various starting points (critical nodes)
         while self.search_from(self._current_search_start_node, self._current_search_start_offset, self._current_hash,
-                                self._current_reverse_hash,
-                               self._current_bases, self._current_nodes, 0):
+                                self._current_reverse_hash, 0):
             continue
 
         logging.info("N nodes skipped because too many variant nodes: %d" % self._n_nodes_skipped_because_too_complex)
@@ -102,18 +104,14 @@ class DenseKmerFinder:
             return True
         return False
 
-        if self._is_critical_node(node) and offset+1 == self._k:
-            return True
-        logging.info("%d/%d is not critical" % (node, offset))
-        return False
-
-    def search_from(self, node, offset, current_hash, current_reverse_hash, current_bases, current_nodes, n_variant_nodes_passed):
+    def search_from(self, node, offset, current_hash, current_reverse_hash, n_variant_nodes_passed):
 
 
         # change the current hash and current bases
-        first_base = current_bases[-self._k] if len(current_bases) >= self._k else 0
-        first_base_complement = (first_base + 2) % 4 if len(current_nodes) >= self._k else 0
-        current_nodes.pop(0) if len(current_nodes) >= self._k else 0
+        # if we don't have a long enough path, build hash incrementally by adding zero
+        print(self._current_bases)
+        first_base = self._current_bases[-self._k] if len(self._current_bases) >= self._k else 0
+        first_base_complement = (first_base + 2) % 4 if len(self._current_bases) >= self._k else 0
 
         current_hash -= first_base * 4**(self._k-1)
         current_hash *= 4
@@ -125,20 +123,21 @@ class DenseKmerFinder:
         current_reverse_hash /= 4
         current_reverse_hash += current_base_complement * 4**(self._k-1)
 
-        current_bases.append(current_base)
-        current_nodes.append(node)
-        #logging.info("On node %d, offset %d, current hash %d / %d, current bases: %s" % (node, offset, current_hash, current_reverse_hash, current_bases))
+        self._current_bases.append(current_base)
+        self._current_nodes.append(node)
+
+        logging.info("On node %d, offset %d, current hash %d / %d, first base: %d" % (node, offset, current_hash, current_reverse_hash, first_base))
 
 
-        if (node, offset, frozenset(current_nodes)) in self._positions_treated:
-            logging.info("Already treated this exact position and path: %d/%d %s" % (node, offset, current_nodes))
+        if (node, offset, frozenset(self._current_nodes[-self._k:])) in self._positions_treated:
+            logging.info("Already treated this exact position and path: %d/%d %s" % (node, offset, self._current_nodes[-self._k:]))
             return False
 
-        self._positions_treated.add((node, offset, frozenset(current_nodes)))
+        self._positions_treated.add((node, offset, frozenset(self._current_nodes[-self._k:])))
 
         # starts a depth first search from this position until meeting a long enough critical node in graph
-        if len(current_bases) >= self._k:
-            self._add_kmer(current_hash, current_reverse_hash, node, offset, current_nodes)
+        if len(self._current_bases) >= self._k:
+            self._add_kmer(current_hash, current_reverse_hash, node, offset)
 
         if not self._graph.is_linear_ref_node_or_linear_ref_dummy_node(node):
             n_variant_nodes_passed += 1
@@ -157,12 +156,18 @@ class DenseKmerFinder:
                 next_nodes = [node for node in next_nodes if self._graph.is_linear_ref_node_or_linear_ref_dummy_node(node)]
                 self._n_nodes_skipped_because_too_complex -= len(next_nodes)
 
-            for next_node in next_nodes:
+            for i, next_node in enumerate(next_nodes):
                 logging.info("")
-                logging.info("  Continuing to node %d with bases %s" % (next_node, current_bases.copy()))
-                # todo: copy is slow, more effective to just slice the list after each node has been
+                logging.info("  Continuing to node %d with bases %s" % (next_node, self._current_bases[-self._k:]))
                 # processed
-                result = self.search_from(next_node, 0, current_hash, current_reverse_hash, current_bases.copy(), current_nodes.copy(), n_variant_nodes_passed)
+                n_bases_in_path = len(self._current_bases)
+                result = self.search_from(next_node, 0, current_hash, current_reverse_hash, n_variant_nodes_passed)
+                # after processing a chilld, reset current bases and nodes to where we are now before procesing next child
+                logging.info("   Child is done, cutting path at %d" % n_bases_in_path)
+
+                if i < len(next_nodes)-1:  # do not slice for last child, since a new recusion will start after that
+                    self._current_bases.set_n_elements(n_bases_in_path)
+                    self._current_nodes.set_n_elements(n_bases_in_path)
 
             return result
         else:
@@ -173,12 +178,10 @@ class DenseKmerFinder:
                 self._current_search_start_offset = offset + 1
                 self._current_hash = current_hash
                 self._current_reverse_hash = current_reverse_hash
-                self._current_bases = current_bases
-                self._current_nodes = current_nodes
                 logging.info("Stopping at critical position %d, %d, current hash %d, current bases %s\n"
                              % (self._current_search_start_node, self._current_search_start_offset, self._current_hash,
                                 self._current_bases))
                 return True
-            return self.search_from(node, offset + 1, current_hash, current_reverse_hash, current_bases, current_nodes,
+            return self.search_from(node, offset + 1, current_hash, current_reverse_hash,
                                     n_variant_nodes_passed)
 
