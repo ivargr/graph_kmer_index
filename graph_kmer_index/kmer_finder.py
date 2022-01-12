@@ -111,7 +111,7 @@ class DenseKmerFinder:
 
 
         # change the current hash and current bases
-        first_base = current_bases.pop(0) if len(current_bases) == self._k else 0
+        first_base = current_bases.pop(0) if len(current_bases) >= self._k else 0
         first_base_complement = (first_base + 2) % 4 if len(current_nodes) >= self._k else 0
         current_nodes.pop(0) if len(current_nodes) >= self._k else 0
 
