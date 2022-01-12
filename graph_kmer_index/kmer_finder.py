@@ -111,7 +111,7 @@ class DenseKmerFinder:
 
 
         # change the current hash and current bases
-        first_base = current_bases.pop(0) if len(current_bases) >= self._k else 0
+        first_base = current_bases[-self._k] if len(current_bases) >= self._k else 0
         first_base_complement = (first_base + 2) % 4 if len(current_nodes) >= self._k else 0
         current_nodes.pop(0) if len(current_nodes) >= self._k else 0
 
@@ -137,7 +137,7 @@ class DenseKmerFinder:
         self._positions_treated.add((node, offset, frozenset(current_nodes)))
 
         # starts a depth first search from this position until meeting a long enough critical node in graph
-        if len(current_bases) == self._k:
+        if len(current_bases) >= self._k:
             self._add_kmer(current_hash, current_reverse_hash, node, offset, current_nodes)
 
         if not self._graph.is_linear_ref_node_or_linear_ref_dummy_node(node):
