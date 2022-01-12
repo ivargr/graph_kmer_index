@@ -1,12 +1,13 @@
 import logging
 import numpy as np
 from .flat_kmers import FlatKmers2
+from .critical_graph_paths import CriticalGraphPaths
 
 class DenseKmerFinder:
     """
     Finds all possible kmers in graph
     """
-    def __init__(self, graph, k, only_save_one_node_per_kmer=False, max_variant_nodes=5,
+    def __init__(self, graph, k, critical_graph_paths=None, only_save_one_node_per_kmer=False, max_variant_nodes=5,
                  include_reverse_complements=False, variant_to_nodes=None, only_store_variant_nodes=False):
         self._graph = graph
         self._linear_ref_nodes = self._graph.linear_ref_nodes()
@@ -35,6 +36,15 @@ class DenseKmerFinder:
         self._variant_to_nodes = variant_to_nodes
         if self._only_store_variant_nodes:
             assert variant_to_nodes is not None
+
+        self._critical_graph_paths = critical_graph_paths
+        if self._critical_graph_paths is None:
+            logging.info("Making critical graph paths since it's not specified. "
+                         "Will be faster if critical graph paths is premade")
+            self._critical_graph_paths = CriticalGraphPaths.from_graph(graph, k)
+
+
+        self._positions_treated = set()
 
     def get_flat_kmers(self):
         return FlatKmers2(np.array(self._kmers, dtype=np.int64), np.array(self._start_nodes, np.int32),
@@ -88,12 +98,17 @@ class DenseKmerFinder:
     def _is_critical_position(self, node, offset):
         # critical position means that there are only one kmer ending at this position (not multiple paths before)
         # and the node is a critical node
+        if self._critical_graph_paths.is_critical(node, offset):
+            return True
+        return False
+
         if self._is_critical_node(node) and offset+1 == self._k:
             return True
         logging.info("%d/%d is not critical" % (node, offset))
         return False
 
     def search_from(self, node, offset, current_hash, current_reverse_hash, current_bases, current_nodes, n_variant_nodes_passed):
+
 
         # change the current hash and current bases
         first_base = current_bases.pop(0) if len(current_bases) == self._k else 0
@@ -113,6 +128,13 @@ class DenseKmerFinder:
         current_bases.append(current_base)
         current_nodes.append(node)
         #logging.info("On node %d, offset %d, current hash %d / %d, current bases: %s" % (node, offset, current_hash, current_reverse_hash, current_bases))
+
+
+        if (node, offset, frozenset(current_nodes)) in self._positions_treated:
+            logging.info("Already treated this exact position and path: %d/%d %s" % (node, offset, current_nodes))
+            return False
+
+        self._positions_treated.add((node, offset, frozenset(current_nodes)))
 
         # starts a depth first search from this position until meeting a long enough critical node in graph
         if len(current_bases) == self._k:

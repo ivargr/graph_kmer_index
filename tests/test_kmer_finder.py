@@ -18,9 +18,6 @@ def very_simple_test():
     finder.find()
     flat = finder.get_flat_kmers()
 
-    print(flat._hashes)
-    print(flat._nodes)
-    print(flat._start_nodes)
     index = KmerIndex2.from_flat_kmers(flat)
 
     assert np.all(index.get_nodes(sequence_to_kmer_hash("ATA")) == [0, 2, 3])
@@ -53,5 +50,20 @@ def simple_test():
 
 
 
+def test_nested_paths():
+    # checking that the recusion stops at the nested node 3 so that we are not duplicating entires after that
+    graph = Graph.from_dicts(
+        {0: "AAA", 1: "C", 2: "T", 3: "AAAA", 4: "C", 5: "G", 6: "AAA", 7: "TTT"},
+        {0: [1, 2, 7], 1: [3], 2: [3], 3: [4, 5], 4: [6], 5: [6], 7: [6]},
+        [0, 1, 3, 4, 6]
+    )
+    graph.set_numeric_node_sequences()
+    finder = DenseKmerFinder(graph, k=3, include_reverse_complements=False)
+    finder.find()
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+    assert len(flat._hashes) == 41, len(flat._hashes)
+
 very_simple_test()
 simple_test()
+test_nested_paths()
