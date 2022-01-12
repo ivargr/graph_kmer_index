@@ -6,12 +6,11 @@ class DenseKmerFinder:
     """
     Finds all possible kmers in graph
     """
-    def __init__(self, graph, k, add_reverse_complements=True, only_save_one_node_per_kmer=False, max_variant_nodes=5,
+    def __init__(self, graph, k, only_save_one_node_per_kmer=False, max_variant_nodes=5,
                  include_reverse_complements=False, variant_to_nodes=None, only_store_variant_nodes=False):
         self._graph = graph
         self._linear_ref_nodes = self._graph.linear_ref_nodes()
         self._k = k
-        self._add_reverse_complements = add_reverse_complements
         self._only_save_one_node_per_kmer = only_save_one_node_per_kmer
         self._max_variant_nodes = max_variant_nodes
         self._start_nodes = []
@@ -38,17 +37,19 @@ class DenseKmerFinder:
             assert variant_to_nodes is not None
 
     def get_flat_kmers(self):
-        return FlatKmers2(np.array(self._kmers, dtype=np.int64), np.array(self._nodes, np.int32), np.array(self._start_nodes, np.int32),
-                          np.array(self._start_offsets, dtype=np.int16), np.array(self._allele_frequencies, np.single))
+        return FlatKmers2(np.array(self._kmers, dtype=np.int64), np.array(self._start_nodes, np.int32),
+                          np.array(self._start_offsets, dtype=np.int16), np.array(self._nodes, np.int32),
+                          np.array(self._allele_frequencies, np.single))
 
     def _find_search_starting_points(self):
         # finds all critical nodes with length >= k in order to find suitable starting points for recursive searches
         pass
 
     def _add_kmer(self, kmer, reverse_kmer, start_node, start_offset, nodes):
-        logging.info("Adding kmer %d at node/offset %d/%d" % (kmer, start_node, start_offset))
+        logging.info("Adding kmer %d at node/offset %d/%d with nodes %s. Start node/offset: %d/%d" %
+                     (kmer, start_node, start_offset, nodes, start_node, start_offset))
         kmers = [kmer, reverse_kmer]
-        if not self._add_reverse_complements:
+        if not self._include_reverse_complement:
             kmers = [kmer]
 
         kmer_allele_frequency = min([self._graph.get_node_allele_frequency(node) for node in nodes])
@@ -60,8 +61,10 @@ class DenseKmerFinder:
             if self._only_save_one_node_per_kmer:
                 nodes = [nodes[0]]
 
-            # add one hit for each node
-            for node in nodes:
+            # add one hit for each unique node
+            logging.info("Nodes: %s, unique: %s" % (nodes, np.unique(nodes)))
+            for node in np.unique(nodes):
+                logging.info("    Adding start node %d for node %d" % (start_node, node))
                 self._start_nodes.append(start_node)
                 self._start_offsets.append(start_offset)
                 self._nodes.append(node)
@@ -80,12 +83,14 @@ class DenseKmerFinder:
     def _is_critical_node(self, node):
         if node in self._linear_ref_nodes:
             return True
+        return False
 
     def _is_critical_position(self, node, offset):
         # critical position means that there are only one kmer ending at this position (not multiple paths before)
         # and the node is a critical node
-        if self._is_critical_node(node) and offset == self._k:
+        if self._is_critical_node(node) and offset+1 == self._k:
             return True
+        logging.info("%d/%d is not critical" % (node, offset))
         return False
 
     def search_from(self, node, offset, current_hash, current_reverse_hash, current_bases, current_nodes, n_variant_nodes_passed):
@@ -93,6 +98,8 @@ class DenseKmerFinder:
         # change the current hash and current bases
         first_base = current_bases.pop(0) if len(current_bases) == self._k else 0
         first_base_complement = (first_base + 2) % 4 if len(current_nodes) >= self._k else 0
+        current_nodes.pop(0) if len(current_nodes) >= self._k else 0
+
         current_hash -= first_base * 4**(self._k-1)
         current_hash *= 4
         current_base = self._graph.get_numeric_base_sequence(node, offset)
@@ -113,6 +120,7 @@ class DenseKmerFinder:
 
         if not self._graph.is_linear_ref_node_or_linear_ref_dummy_node(node):
             n_variant_nodes_passed += 1
+
 
         # if at end of node, continue on edges
         if offset == self._graph.get_node_size(node)-1:
@@ -137,17 +145,18 @@ class DenseKmerFinder:
             return result
         else:
 
-            if self._is_critical_position(node, offset):
-                # stop recursion
+            if self._is_critical_position(node, offset+1):
+                # stop recursion, next position is critical
                 self._current_search_start_node = node
-                self._current_search_start_offset = offset+1
+                self._current_search_start_offset = offset + 1
                 self._current_hash = current_hash
                 self._current_reverse_hash = current_reverse_hash
                 self._current_bases = current_bases
                 self._current_nodes = current_nodes
                 logging.info("Stopping at critical position %d, %d, current hash %d, current bases %s\n"
-                             % (self._current_search_start_node, self._current_search_start_offset, self._current_hash, self._current_bases))
+                             % (self._current_search_start_node, self._current_search_start_offset, self._current_hash,
+                                self._current_bases))
                 return True
-
-            return self.search_from(node, offset+1, current_hash, current_reverse_hash, current_bases, current_nodes, n_variant_nodes_passed)
+            return self.search_from(node, offset + 1, current_hash, current_reverse_hash, current_bases, current_nodes,
+                                    n_variant_nodes_passed)
 

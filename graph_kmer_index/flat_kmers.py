@@ -21,20 +21,6 @@ class FlatKmers2:
         else:
             self._allele_frequencies = allele_frequencies
 
-    @classmethod
-    def from_file(cls, file_name):
-        try:
-            data = np.load(file_name)
-        except FileNotFoundError:
-            data = np.load(file_name + ".npz")
-
-        logging.info("Loaded kmers from %s" % file_name)
-        return cls(data["hashes"], data["nodes"], data["start_nodes"], data["start_offsets"], data["allele_frequencies"])
-
-    def to_file(self, file_name):
-        np.savez(file_name, hashes=self._hashes, nodes=self._nodes, start_nodes=self._start_nodes, start_offsets=self._start_offsets,
-                 allele_frequencies=self._allele_frequencies)
-        logging.info("Saved to %s.npz" % file_name)
 
 
 class FlatKmers:
