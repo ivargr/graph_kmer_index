@@ -405,6 +405,27 @@ def run_argument_parser(args):
     subparser.add_argument("-m", "--modulo", required=False, default=200000033, type=int)
     subparser.set_defaults(func=create_counter_index)
 
+
+    def index(args):
+        from .kmer_finder import DenseKmerFinder
+        from .collision_free_kmer_index import KmerIndex2
+        from shared_memory_wrapper import to_file, from_file
+        graph = Graph.from_file(args.graph)
+        kmer_finder = DenseKmerFinder(graph, args.kmer_size, max_variant_nodes=5,
+                                        include_reverse_complements=False)
+        kmer_finder.find()
+
+        logging.info("Making index from flat kmers")
+        index = KmerIndex2.from_flat_kmers(kmer_finder.get_flat_kmers())
+        to_file(index, args.out_file_name)
+
+
+    subparser = subparsers.add_parser("index")
+    subparser.add_argument("-g", "--graph", required=True)
+    subparser.add_argument("-k", "--kmer-size", type=int, default=31, required=False)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.set_defaults(func=index)
+
     if len(args) == 0:
         parser.print_help()
         sys.exit(1)

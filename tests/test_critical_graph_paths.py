@@ -78,8 +78,23 @@ def test5():
 
 
 
+def test6():
+    graph = Graph.from_dicts(
+        {1: "AAAAA", 2: "", 3: "CCCCCC"},
+        {1: [2], 2: [3]},
+        [1, 3]
+    )
+    graph.make_linear_ref_node_and_ref_dummy_node_index()
+
+    k = 3
+    c = CriticalGraphPaths.from_graph(graph, k)
+    assert np.all(c.nodes == [1])
+    assert np.all(c.offsets == [2])
+
+
 test()
 test2()
 test3()
 test4()
 test5()
+test6()
