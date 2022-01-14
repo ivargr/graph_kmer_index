@@ -179,6 +179,32 @@ def test_two_long_nodes():
     assert set(start_pos) == set([2, 3])
 
 
+def test_two_long_nodes2():
+    graph = Graph.from_dicts(
+        {1: "CATGCATGCCTG", 2: "CCAAG"},
+        {1: [2]},
+        [1, 2]
+    )
+    graph.set_numeric_node_sequences()
+    finder = DenseKmerFinder(graph, k=5, include_reverse_complements=False)
+    finder.find()
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+
+    start_pos = set(index.get_start_offsets(sequence_to_kmer_hash("CTGCC")))
+    assert set(start_pos) == set([1])
+    print(index.get_start_nodes(sequence_to_kmer_hash("CTGCC")))
+    assert set(index.get_start_nodes(sequence_to_kmer_hash("CTGCC"))) == set([2])
+    assert set(index.get_nodes(sequence_to_kmer_hash("CTGCC"))) == set([1, 2])
+    assert len(index.get_start_nodes(sequence_to_kmer_hash("CTGCC"))) == 2
+
+    assert list(index.get_start_offsets(sequence_to_kmer_hash("GCCTG"))) == [11]
+    assert list(index.get_start_offsets(sequence_to_kmer_hash("CCAAG"))) == [4]
+    assert set(list(index.get_start_offsets(sequence_to_kmer_hash("CATGC")))) == set([4, 8])
+
+
+
+
 def test_neighbouring_dummy_nodes():
 
     graph = Graph.from_dicts(
@@ -234,7 +260,40 @@ def test_max_variant_nodes():
     assert set(index.get_nodes(sequence_to_kmer_hash("GAC"))) == set([3, 5, 6])
 
 
-"""
+
+def test_snp_and_long_node():
+    graph = Graph.from_dicts(
+        {1: "ACTACTACTACT", 2: "G", 3: "C", 4: "GCAGCA"},
+        {1: [2, 3], 2: [4], 3: [4]},
+        [1, 2, 4]
+    )
+    graph.set_numeric_node_sequences()
+
+    finder = DenseKmerFinder(graph, k=3, include_reverse_complements=False)
+    finder.find()
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+
+    assert set(index.get_start_offsets(sequence_to_kmer_hash("CTG"))) == set([0])
+    assert set(index.get_start_offsets(sequence_to_kmer_hash("TAC"))) == set([4, 7, 10])
+
+
+
+def test_large_k():
+    graph = Graph.from_dicts(
+        {1: "G"*100, 2: "C", 3: "T", 4: "G"*10},
+        {1: [2, 3], 2: [4], 3: [4]},
+        [1, 2, 4]
+    )
+    graph.set_numeric_node_sequences()
+
+    finder = DenseKmerFinder(graph, k=31, include_reverse_complements=False)
+    finder.find()
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+    print(index.get_start_offsets(sequence_to_kmer_hash("G"*31)))
+
+
 very_simple_test()
 simple_test()
 test_nested_paths()
@@ -242,8 +301,10 @@ test_empty_dummy_nodes2()
 test_empty_dummy_nodes3()
 test_empty_dummy_nodes()
 test_graph_with_multiple_critical_points()
-test_two_long_nodes()
-test_long_node()
-"""
 test_neighbouring_dummy_nodes()
 test_max_variant_nodes()
+test_long_node()
+test_two_long_nodes()
+test_two_long_nodes2()
+test_snp_and_long_node()
+test_large_k()

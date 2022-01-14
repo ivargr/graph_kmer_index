@@ -409,9 +409,15 @@ def run_argument_parser(args):
     def index(args):
         from .kmer_finder import DenseKmerFinder
         from .collision_free_kmer_index import KmerIndex2
+        from .critical_graph_paths import CriticalGraphPaths
         from shared_memory_wrapper import to_file, from_file
         graph = Graph.from_file(args.graph)
-        kmer_finder = DenseKmerFinder(graph, args.kmer_size, max_variant_nodes=5,
+        critical_paths = None
+        if args.critical_graph_paths is not None:
+            critical_paths = from_file(args.critical_graph_paths)
+
+        kmer_finder = DenseKmerFinder(graph, args.kmer_size, critical_paths=critical_paths,
+                                      max_variant_nodes=5,
                                         include_reverse_complements=False,
                                       only_save_one_node_per_kmer=True)
         kmer_finder.find()
@@ -423,9 +429,24 @@ def run_argument_parser(args):
 
     subparser = subparsers.add_parser("index")
     subparser.add_argument("-g", "--graph", required=True)
+    subparser.add_argument("-c", "--critical_graph_paths", required=False, help="Will be created if not specified")
     subparser.add_argument("-k", "--kmer-size", type=int, default=31, required=False)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.set_defaults(func=index)
+
+
+    def find_critical_paths(args):
+        from .critical_graph_paths import CriticalGraphPaths
+        graph = Graph.from_file(args.graph)
+        critical_paths = CriticalGraphPaths.from_graph(graph, args.kmer_size)
+        to_file(critical_paths, args.out_file_name)
+        logging.info("Wrote to file %s" % args.out_file_name)
+
+    subparser = subparsers.add_parser("find_critical_paths")
+    subparser.add_argument("-g", "--graph", required=True)
+    subparser.add_argument("-k", "--kmer-size", type=int, default=31, required=False)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.set_defaults(func=find_critical_paths)
 
     if len(args) == 0:
         parser.print_help()
