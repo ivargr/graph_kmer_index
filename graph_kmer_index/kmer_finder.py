@@ -186,18 +186,11 @@ class DenseKmerFinder:
                     self._current_path_start_position += 1
 
                 current_hash = (current_hash - first_base * 4 ** (self._k - 1)) * 4 + current_base
-
                 current_base_complement = (current_base+2) % 4
+                current_reverse_hash -= (current_reverse_hash-first_base_complement) / 4 + \
+                                        current_base_complement * 4**(self._k-1)
 
-                current_reverse_hash -= first_base_complement
-                current_reverse_hash /= 4
-                current_reverse_hash += current_base_complement * 4**(self._k-1)
-
-            if current_hash < 0:
-                logging.error("Hash < 0")
-                logging.error(current_hash)
-                logging.error("First base: %d" % first_base)
-                raise Exception("")
+            assert current_hash >= 0
 
             self._current_bases.append(current_base)
             self._current_nodes.append(node)
