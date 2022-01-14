@@ -412,7 +412,8 @@ def run_argument_parser(args):
         from shared_memory_wrapper import to_file, from_file
         graph = Graph.from_file(args.graph)
         kmer_finder = DenseKmerFinder(graph, args.kmer_size, max_variant_nodes=5,
-                                        include_reverse_complements=False)
+                                        include_reverse_complements=False,
+                                      only_save_one_node_per_kmer=True)
         kmer_finder.find()
 
         logging.info("Making index from flat kmers")

@@ -180,9 +180,61 @@ def test_two_long_nodes():
 
 
 def test_neighbouring_dummy_nodes():
-    pass
+
+    graph = Graph.from_dicts(
+        {1: "ACT", 2: "", 3: "GGG", 4: "", 5: "A", 6: "CCC"},
+        {1: [2, 3], 2: [4, 5], 3: [4, 5], 4: [6], 5: [6]},
+        [1, 5, 6]
+    )
+
+    graph.set_numeric_node_sequences()
+    finder = DenseKmerFinder(graph, k=3, include_reverse_complements=False)
+    finder.find()
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
 
 
+    # passing two dummy nodes:
+    assert set(index.get_nodes(sequence_to_kmer_hash("TCC"))) == set([1, 2, 4, 6])
+    # single dummy node
+    assert set(index.get_nodes(sequence_to_kmer_hash("TAC"))) == set([1, 2, 5, 6])
+    assert set(index.get_nodes(sequence_to_kmer_hash("GCC"))) == set([3, 4, 6])
+
+
+def test_max_variant_nodes():
+    graph = Graph.from_dicts(
+        {1: "ACT", 2: "", 3: "GGG", 4: "", 5: "A", 6: "CCC"},
+        {1: [2, 3], 2: [4, 5], 3: [4, 5], 4: [6], 5: [6]},
+        [1, 5, 6]
+    )
+    graph.set_numeric_node_sequences()
+
+    max_variant_nodes = 0
+    finder = DenseKmerFinder(graph, k=3, include_reverse_complements=False, max_variant_nodes=max_variant_nodes)
+    finder.find()
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+
+    assert set(index.get_nodes(sequence_to_kmer_hash("CTA"))) == set([1, 2, 5])
+    assert set(index.get_nodes(sequence_to_kmer_hash("TAC"))) == set([1, 2, 5, 6])
+    assert set(index.get_nodes(sequence_to_kmer_hash("GGG"))) == set([])
+    assert set(index.get_nodes(sequence_to_kmer_hash("TCC"))) == set([])
+
+
+    max_variant_nodes = 1  # first variant node should be chosen, but not first AND second
+    finder = DenseKmerFinder(graph, k=3, include_reverse_complements=False, max_variant_nodes=max_variant_nodes)
+    finder.find()
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+
+    assert set(index.get_nodes(sequence_to_kmer_hash("TGG"))) == set([1, 3])
+    assert set(index.get_nodes(sequence_to_kmer_hash("TCC"))) == set([1, 2, 4, 6])
+    assert set(index.get_nodes(sequence_to_kmer_hash("GCC"))) == set()
+    assert set(index.get_nodes(sequence_to_kmer_hash("GGC"))) == set()
+    assert set(index.get_nodes(sequence_to_kmer_hash("GAC"))) == set([3, 5, 6])
+
+
+"""
 very_simple_test()
 simple_test()
 test_nested_paths()
@@ -192,3 +244,6 @@ test_empty_dummy_nodes()
 test_graph_with_multiple_critical_points()
 test_two_long_nodes()
 test_long_node()
+"""
+test_neighbouring_dummy_nodes()
+test_max_variant_nodes()
