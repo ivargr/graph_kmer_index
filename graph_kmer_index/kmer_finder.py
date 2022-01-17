@@ -25,7 +25,9 @@ class DenseKmerFinder:
     Finds all possible kmers in graph
     """
     def __init__(self, graph, k, critical_graph_paths=None, only_save_one_node_per_kmer=False, max_variant_nodes=4,
-                 include_reverse_complements=False, variant_to_nodes=None, only_store_variant_nodes=False, stop_at_critical_path_number=None):
+                 include_reverse_complements=False, only_store_variant_nodes=False,
+                 start_at_critical_path_number=None, stop_at_critical_path_number=None,
+                 whitelist=None):
         self._graph = graph
         self._linear_ref_nodes = self._graph.linear_ref_nodes()
         self._k = k
@@ -53,7 +55,6 @@ class DenseKmerFinder:
         self._include_reverse_complement = include_reverse_complements
 
         self._only_store_variant_nodes = only_store_variant_nodes
-        self._variant_to_nodes = variant_to_nodes
         if self._only_store_variant_nodes:
             assert variant_to_nodes is not None
 
@@ -69,17 +70,23 @@ class DenseKmerFinder:
         self._recursion_depth = 0
         
         self._stop_at_critical_path_number = stop_at_critical_path_number
+        self._start_at_critical_path_number = start_at_critical_path_number
+
+        self._whitelist = whitelist  # set of kmers, do not store any other than these
+        self._n_skipped_whitelist = 0
+
 
     def get_flat_kmers(self):
         return FlatKmers2(self._kmers.get_nparray(), self._start_nodes.get_nparray(),
                           self._start_offsets.get_nparray(), self._nodes.get_nparray(),
                             self._allele_frequencies.get_nparray())
 
-    def _find_search_starting_points(self):
-        # finds all critical nodes with length >= k in order to find suitable starting points for recursive searches
-        pass
-
     def _add_kmer(self, kmer, reverse_kmer, start_node, start_offset):
+
+        if self._whitelist is not None and not (kmer in whitelist or reverse_kmer in whitelist):
+            self._n_skipped_whitelist += 1
+            return
+
         nodes = np.unique(self._current_nodes[self._current_path_start_position:])
         #logging.info("     Adding kmer %d at node/offset %d/%d with nodes %s. Start node/offset: %d/%d" %
         #             (kmer, start_node, start_offset, nodes, start_node, start_offset))
@@ -109,20 +116,26 @@ class DenseKmerFinder:
 
 
         self._starting_points = list(self._critical_graph_paths)[::-1]
-        
+
+
         stop_at_node = None
         if self._stop_at_critical_path_number is not None:
             stop_at_node = self._starting_points[-self._stop_at_critical_path_number-1][0]
             logging.info("Will stop at node %d" % stop_at_node)
 
-        if self._graph.get_node_size(self._graph.get_first_node()) < self._k:
-            self._starting_points.append((self._graph.get_first_node(), 0))
 
         self._starting_points_set = set()
         for starting_point in self._starting_points:
             self._starting_points_set.add(starting_point)
 
-        #print("Starting points: %s" % self._starting_points)
+        if self._start_at_critical_path_number is not None:
+            self._starting_points = self._starting_points[:-self._start_at_critical_path_number]  # remove the last
+
+        # add beginning of graph as starting point if necessary
+        if self._start_at_critical_path_number is None or self._start_at_critical_path_number == 0:
+            if self._graph.get_node_size(self._graph.get_first_node()) < self._k:  # means beginning is not a critical point, needs to add
+                self._starting_points.append((self._graph.get_first_node(), 0))
+
 
         #for critical_node, critical_offset in [(self._graph.get_first_node(), 0)] + list(self._critical_graph_paths):
         while len(self._starting_points) > 0:
@@ -145,8 +158,8 @@ class DenseKmerFinder:
 
             self.search_from(critical_node, critical_offset, 0, 0)
 
-
         logging.info("N nodes skipped because too many variant nodes: %d" % self._n_nodes_skipped_because_too_complex)
+        logging.info("N skipped because whitelist: %d" % self._n_skipped_whitelist)
 
 
     def _is_critical_position(self, node, offset):

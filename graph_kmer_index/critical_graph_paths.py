@@ -28,6 +28,7 @@ class CriticalGraphPaths:
     @classmethod
     def from_graph(cls, graph, k):
 
+        logging.info("Getting reverse edges")
         reverse_edges = graph.get_reverse_edges_hashtable()
 
         critical_nodes = []
