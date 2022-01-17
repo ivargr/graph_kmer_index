@@ -4,7 +4,21 @@ from .flat_kmers import FlatKmers2
 from .critical_graph_paths import CriticalGraphPaths
 from npstructures.numpylist import NumpyList
 import sys
-#sys.setrecursionlimit(10000)
+
+def update_hashes(current_base, current_hash, current_reverse_hash, first_base, k, only_add=False):
+    # only_add=True means to build hash without subtracting previous first base
+    current_base_complement = (current_base + 2) % 4
+    if only_add:
+        current_hash = current_hash * 4 + current_base
+        current_reverse_hash = current_reverse_hash / 4 + current_base_complement * 4 ** (k - 1)
+    else:
+        current_hash = (current_hash - first_base * 4 ** (k - 1)) * 4 + current_base
+        first_base_complement = (first_base + 2) % 4
+        current_reverse_hash = (current_reverse_hash - first_base_complement) / 4 + \
+                               current_base_complement * 4 ** (k - 1)
+
+    return current_hash, current_reverse_hash
+
 
 class DenseKmerFinder:
     """
@@ -157,47 +171,9 @@ class DenseKmerFinder:
             # if we are in a middle of a big node, we can process this part more effectively since
             # we know there are no dummy nodes or edges or other stuff to think about
             if offset == self._k+2 and node_size > offset + self._k + 1:
-                sequence = self._graph.get_numeric_node_sequence(node)[offset-self._k:].astype(np.uint64)
-                hashes = np.convolve(sequence, self._power_vector, mode='full')
-                assert hashes.dtype == np.uint64
-                hashes = hashes[self._k:-self._k]  # get actual hashes after boundary effect and don't include last bp
-                assert len(hashes) == node_size-offset-1
-
-                reverse_hashes = np.convolve((sequence+2)%4, self._reverse_power_vector, mode='full')
-                reverse_hashes = reverse_hashes[self._k:-self._k]  # get actual hashes after boundary effect
-                assert len(reverse_hashes) == node_size-offset-1
-
-                assert hashes.dtype == np.uint64 and reverse_hashes.dtype == np.uint64
-
-                bases_to_extend = sequence[self._k:len(sequence)-1]
-                assert len(bases_to_extend) == len(hashes)
-
-                self._current_bases.extend(bases_to_extend)
-                self._current_nodes.extend(np.zeros(len(bases_to_extend))+node)
-                self._current_path_start_position += len(bases_to_extend)
-
-                hashes_to_store = [hashes]
-                if self._include_reverse_complement:
-                    hashes_to_store.append(reverse_hashes)
-
-                for h in hashes_to_store:
-                    n = len(h)
-                    self._kmers.extend(h)
-                    self._nodes.extend(np.zeros(n)+node)
-                    self._start_nodes.extend(np.zeros(n)+node)
-                    self._start_offsets.extend(np.arange(offset, node_size-1))
-                    self._allele_frequencies.extend(np.zeros(n)+self._graph.get_node_allele_frequency(node))
-
-                # continue search from next offset and stop this search
-                # NB: Converting to python int's to avoid problems when working with these hashes further
-                current_hash = int(hashes[-1])
-                current_reverse_hash = int(reverse_hashes[-1])
-                #print("continuing with hash %d (type %s)" % (current_hash, type(current_hash)))
-
-
-                #return self.search_from(node, self._graph.get_node_size(node)-1, current_hash, current_reverse_hash)
-                offset = node_size-1
-
+                current_hash, current_reverse_hash, offset = self._process_whole_node(current_hash,
+                                                                                      current_reverse_hash, node,
+                                                                                      node_size, offset)
             # change the current hash and current bases
             # if we don't have a long enough path, build hash incrementally by adding zero
             first_base = self._get_first_base_in_path()
@@ -205,12 +181,20 @@ class DenseKmerFinder:
             assert first_base != -1
             current_base = self._graph.get_numeric_base_sequence(node, offset)
 
+            only_add = True
             if current_base != -1:
                 if len(self._current_bases) >= self._k:
                     self._current_path_start_position += 1
-                current_hash, current_reverse_hash = self._update_hashes(current_base, current_hash,
-                                                                         current_reverse_hash, first_base)
-            assert current_hash >= 0
+                    only_add = False
+                current_hash, current_reverse_hash = update_hashes(current_base, current_hash,
+                                                                         current_reverse_hash, first_base, self._k,
+                                                                         only_add=only_add)
+            if current_hash < 0:
+                logging.error("Current hash: %d" % current_hash)
+                logging.error("First base: %d" % first_base)
+                logging.error("Current base: %d" % current_base)
+                raise Exception("Error in computing hash")
+
             assert current_reverse_hash >= 0
 
             self._current_bases.append(current_base)
@@ -249,6 +233,39 @@ class DenseKmerFinder:
         # at end of node, continue on edges
         self._search_next_nodes(current_hash, current_reverse_hash, node)
 
+    def _process_whole_node(self, current_hash, current_reverse_hash, node, node_size, offset):
+        sequence = self._graph.get_numeric_node_sequence(node)[offset - self._k:].astype(np.uint64)
+        hashes = np.convolve(sequence, self._power_vector, mode='full')
+        hashes = hashes[self._k:-self._k]  # get actual hashes after boundary effect and don't include last bp
+        assert len(hashes) == node_size - offset - 1
+        reverse_hashes = np.convolve((sequence + 2) % 4, self._reverse_power_vector, mode='full')
+        reverse_hashes = reverse_hashes[self._k:-self._k]  # get actual hashes after boundary effect
+        assert len(reverse_hashes) == node_size - offset - 1
+        assert hashes.dtype == np.uint64 and reverse_hashes.dtype == np.uint64
+        bases_to_extend = sequence[self._k:len(sequence) - 1]
+        assert len(bases_to_extend) == len(hashes)
+        self._current_bases.extend(bases_to_extend)
+        self._current_nodes.extend(np.zeros(len(bases_to_extend)) + node)
+        self._current_path_start_position += len(bases_to_extend)
+        hashes_to_store = [hashes]
+        if self._include_reverse_complement:
+            hashes_to_store.append(reverse_hashes)
+        for h in hashes_to_store:
+            n = len(h)
+            self._kmers.extend(h)
+            self._nodes.extend(np.zeros(n) + node)
+            self._start_nodes.extend(np.zeros(n) + node)
+            self._start_offsets.extend(np.arange(offset, node_size - 1))
+            self._allele_frequencies.extend(np.zeros(n) + self._graph.get_node_allele_frequency(node))
+        # continue search from next offset and stop this search
+        # NB: Converting to python int's to avoid problems when working with these hashes further
+        current_hash = int(hashes[-1])
+        current_reverse_hash = int(reverse_hashes[-1])
+        # print("continuing with hash %d (type %s)" % (current_hash, type(current_hash)))
+        # return self.search_from(node, self._graph.get_node_size(node)-1, current_hash, current_reverse_hash)
+        offset = node_size - 1
+        return current_hash, current_reverse_hash, offset
+
     def _search_next_nodes(self, current_hash, current_reverse_hash, node):
         next_nodes = self._graph.get_edges(node)
         if len(next_nodes) > 0:
@@ -271,23 +288,6 @@ class DenseKmerFinder:
                 self._current_bases.set_n_elements(n_bases_in_path)
                 self._current_nodes.set_n_elements(n_bases_in_path)
                 self._current_path_start_position = path_start
-
-    def _update_hashes(self, current_base, current_hash, current_reverse_hash, first_base):
-        prev_hash = current_hash
-        current_hash = (current_hash - first_base * 4 ** (self._k - 1)) * 4 + current_base
-        current_base_complement = (current_base + 2) % 4
-        first_base_complement = (first_base + 2) % 4 if len(self._current_bases) >= self._k else 0
-        current_reverse_hash = (current_reverse_hash - first_base_complement) / 4 + \
-                               current_base_complement * 4 ** (self._k - 1)
-
-        if current_hash < 0:
-            logging.error("Current hash: %d" % current_hash)
-            logging.error("First base: %d" % first_base)
-            logging.error("Prev hash: %d" % prev_hash)
-            logging.error("Current base: %d" % current_base)
-            raise Exception("Error in computing hash")
-
-        return current_hash, current_reverse_hash
 
     def _get_first_base_in_path(self):
         if len(self._current_bases) >= self._k:
