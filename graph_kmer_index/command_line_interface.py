@@ -284,42 +284,41 @@ def run_argument_parser(args):
     subparser.set_defaults(func=make_reference_kmer_index)
 
     def make_unique_variant_kmers_single_thread(variants, args):
-        r = args.shared_memory_unique_id
-        variant_to_nodes = from_shared_memory(VariantToNodes, "variant_to_nodes_shared"+r)
-        kmer_index = from_shared_memory(CollisionFreeKmerIndex, "kmer_index_shared"+r)
-        graph = from_shared_memory(Graph, "graph_shared"+r)
+        #variant_to_nodes = from_shared_memory(VariantToNodes, "variant_to_nodes_shared"+r)
+        variant_to_nodes = args["variant_to_nodes"]
+
+        #kmer_index = from_shared_memory(CollisionFreeKmerIndex, "kmer_index_shared"+r)
+        kmer_index = args["kmer_index"]
+
+        #graph = from_shared_memory(Graph, "graph_shared"+r)
+        graph = args["graph"]
+
         #graph = Graph.from_file(args.graph)
         logging.info("Reading all variants")
 
         node_to_variants = None
         haplotype_matrix = None
+        """
         if args.haplotype_matrix is not None:
             haplotype_matrix = HaplotypeMatrix.from_file(args.haplotype_matrix)
             node_to_variants = NodeToVariants.from_file(args.node_to_variants)
+        """
 
-        finder = UniqueVariantKmersFinder(graph, variant_to_nodes, variants, args.kmer_size, args.max_variant_nodes,
+        finder = UniqueVariantKmersFinder(graph, variant_to_nodes, variants, args["kmer_size"], args["max_variant_nodes"],
                                           kmer_index_with_frequencies=kmer_index, haplotype_matrix=haplotype_matrix,
                                           node_to_variants=node_to_variants,
-                                          do_not_choose_lowest_frequency_kmers=args.do_not_choose_lowest_frequency_kmers)
+                                          do_not_choose_lowest_frequency_kmers=args["do_not_choose_lowest_frequency_kmers"])
         flat_kmers = finder.find_unique_kmers()
         return flat_kmers
 
     def make_unique_variant_kmers(args):
-        args.shared_memory_unique_id = str(np.random.randint(0,10e15))
-        r = args.shared_memory_unique_id
-        logging.info("Reading kmer index")
-        kmer_index = CollisionFreeKmerIndex.from_file(args.kmer_index)
-        to_shared_memory(kmer_index, "kmer_index_shared"+r)
-        logging.info("Reading variant to nodes")
-        variant_to_nodes = VariantToNodes.from_file(args.variant_to_nodes)
-        to_shared_memory(variant_to_nodes, "variant_to_nodes_shared"+r)
-        logging.info("REading graph")
-        graph = Graph.from_file(args.graph)
-        to_shared_memory(graph, "graph_shared"+r)
+        args = vars(args)
+        args.pop("func")  # necessary for putting args in shared memory
+
         logging.info("Reading all variants")
-        variants = VcfVariants.from_vcf(args.vcf, skip_index=True, make_generator=True)
-        variants = variants.get_chunks(chunk_size=args.chunk_size)
-        pool = Pool(args.n_threads)
+        variants = VcfVariants.from_vcf(args["vcf"], skip_index=True, make_generator=True)
+        variants = variants.get_chunks(chunk_size=args["chunk_size"])
+        pool = Pool(args["n_threads"])
 
         all_flat_kmers = []
         for flat_kmers in pool.starmap(make_unique_variant_kmers_single_thread, zip(variants, repeat(args))):
@@ -327,16 +326,17 @@ def run_argument_parser(args):
 
         logging.info("Merge all flat kmers")
         merged_flat = FlatKmers.from_multiple_flat_kmers(all_flat_kmers)
-        merged_flat.to_file(args.out_file_name)
-        logging.info("Wrote to file %s" % args.out_file_name)
+        merged_flat.to_file(args["out_file_name"])
+        logging.info("Wrote to file %s" % args["out_file_name"])
 
     subparser = subparsers.add_parser("make_unique_variant_kmers", help="Make a reverse variant index lookup to unique kmers on that variant")
-    subparser.add_argument("-g", "--graph", required=True)
-    subparser.add_argument("-V", "--variant_to_nodes", required=True)
+    subparser.add_argument("-g", "--graph", required=True, type=Graph.from_file)
+    subparser.add_argument("-V", "--variant_to_nodes", required=True, type=VariantToNodes.from_file)
     subparser.add_argument("-N", "--node-to-variants", required=False)
     subparser.add_argument("-H", "--haplotype-matrix", required=False)
     subparser.add_argument("-k", "--kmer-size", required=True, type=int)
-    subparser.add_argument("-i", "--kmer-index", required=True, help="Kmer index used to check frequency of kmers in genome")
+    subparser.add_argument("-i", "--kmer-index", required=False, help="Kmer index used to check frequency of kmers in genome", type=CollisionFreeKmerIndex.from_file)
+    subparser.add_argument("-I", "--kmer-counter", required=False, help="Kmer index used to check frequency of kmers in genome", type=from_file)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-v", "--vcf", required=True)
     subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
