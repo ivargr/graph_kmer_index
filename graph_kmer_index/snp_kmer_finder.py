@@ -326,7 +326,7 @@ class SnpKmerFinder:
     def find_kmers_from_linear_ref_position(self, pos):
         self._find_all_variant_kmers_from_position(pos)
 
-    def get_flat_kmers(self):
+    def get_flat_kmers(self, v=None):
         return FlatKmers(np.array(self._hashes, dtype=np.uint64), np.array(self._nodes, np.uint32), np.array(self._ref_offsets, np.uint64), np.array(self._allele_frequencies, np.single))
 
     def find_kmers_on_linear_reference(self):

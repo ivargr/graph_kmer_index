@@ -22,6 +22,9 @@ class CriticalGraphPaths:
 
         return self._index[node] == offset
 
+    def __len__(self):
+        return len(self.nodes)
+
     def __iter__(self):
         return ((node, offset) for node, offset in zip(self.nodes, self.offsets))
 

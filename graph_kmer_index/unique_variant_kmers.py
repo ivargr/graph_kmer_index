@@ -4,11 +4,13 @@ import time
 from .snp_kmer_finder import SnpKmerFinder
 from .flat_kmers import FlatKmers
 from obgraph import VariantNotFoundException
+from .kmer_finder import DenseKmerFinder
 
 
 class UniqueVariantKmersFinder:
-    def __init__(self, graph, variant_to_nodes, variants, k=31, max_variant_nodes=6, kmer_index_with_frequencies=None, haplotype_matrix=None, node_to_variants=None,
-                 do_not_choose_lowest_frequency_kmers=False):
+    def __init__(self, graph, variant_to_nodes, variants, k=31, max_variant_nodes=6,
+                 kmer_index_with_frequencies=None, haplotype_matrix=None, node_to_variants=None,
+                 do_not_choose_lowest_frequency_kmers=False, use_dense_kmer_finder=False, position_id_index=None):
         self.graph = graph
         self.variant_to_nodes = variant_to_nodes
         self.reference_kmer_index = None
@@ -21,6 +23,10 @@ class UniqueVariantKmersFinder:
         self._kmer_index_with_frequencies = kmer_index_with_frequencies
         self.haplotype_matrix = haplotype_matrix
         self.node_to_variants = node_to_variants
+        self._use_dense_kmer_finder = use_dense_kmer_finder
+        self._position_id_index = position_id_index
+        if self._use_dense_kmer_finder:
+            assert self._position_id_index is not None, "Position id index must be set when using dense kmer finder"
 
         self._choose_kmers_with_lowest_frequencies = True
         if do_not_choose_lowest_frequency_kmers:
@@ -48,18 +54,26 @@ class UniqueVariantKmersFinder:
         for possible_ref_position in possible_ref_positions:
             possible_ref_position_adjusted = self.graph.convert_chromosome_ref_offset_to_graph_ref_offset(possible_ref_position, variant.chromosome)
             is_valid = True
-            finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=self._max_variant_nodes, only_store_nodes=set([ref_node, variant_node]),
-                                   haplotype_matrix=self.haplotype_matrix, node_to_variants=self.node_to_variants, variant_to_nodes=self.variant_to_nodes)
-            finder.find_kmers_from_linear_ref_position(possible_ref_position_adjusted)
+            if not self._use_dense_kmer_finder:
+                finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=self._max_variant_nodes, only_store_nodes=set([ref_node, variant_node]),
+                                       haplotype_matrix=self.haplotype_matrix, node_to_variants=self.node_to_variants, variant_to_nodes=self.variant_to_nodes)
+                finder.find_kmers_from_linear_ref_position(possible_ref_position_adjusted)
+            else:
+                finder = DenseKmerFinder(self.graph, self.k, None, position_id=self._position_id_index,
+                                         max_variant_nodes=self._max_variant_nodes, only_store_nodes=set([ref_node, variant_node]),
+                                         )
+                node = self.graph.get_node_at_ref_offset(possible_ref_position_adjusted)
+                offset = self.graph.get_node_offset_at_ref_offset(possible_ref_position_adjusted)
+                finder.find_only_kmers_starting_at_position(node, offset)
 
 
             kmers_ref = set()
             kmers_variant = set()
             for kmer, nodes, ref_position, hash in finder.kmers_found:
                 if ref_node in nodes:
-                    kmers_ref.add(kmer.lower())
+                    kmers_ref.add(hash)
                 if variant_node in nodes:
-                    kmers_variant.add(kmer.lower())
+                    kmers_variant.add(hash)
 
                 # not a requirement anymore
                 #if not self.kmer_is_unique_on_reference_position(hash, ref_position, max(0, ref_position - 150), ref_position + 150 - self.k):
@@ -86,7 +100,7 @@ class UniqueVariantKmersFinder:
 
             if is_valid:
                 # Kmers are valid, we don't need to search anymore for this variant
-                flat = finder.get_flat_kmers()
+                flat = finder.get_flat_kmers(v="1")
                 valid_positions_found.append(flat)
 
                 if flat.maximum_kmer_frequency(self._kmer_index_with_frequencies) <= 1:

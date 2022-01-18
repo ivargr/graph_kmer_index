@@ -1,7 +1,10 @@
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 import sys
 import argparse
-import logging
+import itertools
 #from multiprocessing import shared_memory
+import time
 from multiprocessing import Pool, Process
 import numpy as np
 from itertools import repeat
@@ -9,7 +12,6 @@ from pyfaidx import Fasta
 
 from .collision_free_kmer_index import CollisionFreeKmerIndex
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 from obgraph import Graph
 from .snp_kmer_finder import SnpKmerFinder
 import pickle
@@ -20,11 +22,17 @@ from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
 from obgraph.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
-from shared_memory_wrapper.shared_memory import to_shared_memory, from_shared_memory, remove_shared_memory_in_session, to_file, from_file
+from shared_memory_wrapper.shared_memory import to_shared_memory, from_shared_memory, remove_shared_memory_in_session, to_file, from_file, object_to_shared_memory, object_from_shared_memory
+from shared_memory_wrapper import get_shared_pool, close_shared_pool
 from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
 from obgraph.haplotype_matrix import HaplotypeMatrix
 from npstructures import HashTable, Counter
 from .collision_free_kmer_index import CounterKmerIndex
+from .kmer_finder import DenseKmerFinder
+from .collision_free_kmer_index import KmerIndex2
+from .critical_graph_paths import CriticalGraphPaths
+from shared_memory_wrapper import to_file, from_file
+from obgraph.position_id import PositionId
 
 
 def main():
@@ -406,32 +414,72 @@ def run_argument_parser(args):
     subparser.set_defaults(func=create_counter_index)
 
 
-    def index(args):
-        from .kmer_finder import DenseKmerFinder
-        from .collision_free_kmer_index import KmerIndex2
-        from .critical_graph_paths import CriticalGraphPaths
-        from shared_memory_wrapper import to_file, from_file
-        graph = Graph.from_file(args.graph)
-        critical_paths = None
-        if args.critical_graph_paths is not None:
-            critical_paths = from_file(args.critical_graph_paths)
+    def index_single_thread(data):
+        args, chunk = data
+        args = object_from_shared_memory(args)
 
-        kmer_finder = DenseKmerFinder(graph, args.kmer_size, critical_paths=critical_paths,
+
+        logging.info("Processing chunk %s" % str(chunk))
+        t = time.perf_counter()
+        kmer_finder = DenseKmerFinder(args["graph"], args["kmer_size"], critical_graph_paths=args["critical_graph_paths"],
+                                      position_id=args["position_id"],
                                       max_variant_nodes=5,
-                                        include_reverse_complements=False,
-                                      only_save_one_node_per_kmer=True)
+                                      only_save_one_node_per_kmer=True,
+                                      start_at_critical_path_number=chunk[0],
+                                      stop_at_critical_path_number=chunk[1],
+                                      whitelist=args["whitelist"])
         kmer_finder.find()
+        return kmer_finder.get_flat_kmers(v="1")
+        logging.info("Took %d sec to find kmers" % (time.perf_counter()-t))
 
-        logging.info("Making index from flat kmers")
-        index = KmerIndex2.from_flat_kmers(kmer_finder.get_flat_kmers())
-        to_file(index, args.out_file_name)
+    def index(args):
+        pool = get_shared_pool(args.n_threads)
+
+        critical_paths = None
+        if args.critical_graph_paths is None:
+            args.critical_paths = CriticalGraphPaths.from_graph(graph, args.k)
+
+        args.position_id = PositionId.from_graph(graph) if args.position_id is not None else None
+
+        args = vars(args)
+        args.pop("func")
+        args_shared = object_to_shared_memory(args)
+        critical_paths = args["critical_graph_paths"]
+
+        n_chunks = args["n_threads"]*3
+
+        assert n_chunks < len(critical_paths), "Too many threads for data. Try with fewer"
+
+        logging.info("There are %d critical paths" % len(critical_paths))
+
+        starting_indexes = list(range(0, len(critical_paths), len(critical_paths)//n_chunks))
+        ending_indexes = starting_indexes[1:] + [len(critical_paths)]
+        chunks = list((s, e) for s, e in zip(starting_indexes, ending_indexes))
+
+        logging.info("Will process chunks (from,to): %s" % chunks)
+
+        t = time.perf_counter()
+        flat_kmers = []
+        for results in pool.imap(index_single_thread, zip(itertools.repeat(args_shared), chunks)):
+            flat_kmers.append(results)
+            logging.info("Done with chunk")
+
+        logging.info("Time spent to make indexes: %.2f" % (time.perf_counter()-t))
+        close_shared_pool()
+
+        flat_kmers = FlatKmers.from_multiple_flat_kmers(flat_kmers)
+        flat_kmers.to_file(args["out_file_name"])
+        logging.info("Wrote final FlatKmers to %s" % args["out_file_name"])
 
 
     subparser = subparsers.add_parser("index")
-    subparser.add_argument("-g", "--graph", required=True)
-    subparser.add_argument("-c", "--critical_graph_paths", required=False, help="Will be created if not specified")
+    subparser.add_argument("-g", "--graph", required=True, type=Graph.from_file)
+    subparser.add_argument("-c", "--critical_graph_paths", required=False, type=from_file, help="Will be created if not specified")
+    subparser.add_argument("-p", "--position_id", required=False, type=from_file, help="Will be created if not specified")
     subparser.add_argument("-k", "--kmer-size", type=int, default=31, required=False)
     subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.add_argument("-t", "--n-threads", required=False, type=int, default=1)
+    subparser.add_argument("-w", "--whitelist", required=False, type=lambda e: set(FlatKmers.from_file(e)._hashes), help="Only store kmers that are in the whitelist")
     subparser.set_defaults(func=index)
 
 
@@ -447,6 +495,34 @@ def run_argument_parser(args):
     subparser.add_argument("-k", "--kmer-size", type=int, default=31, required=False)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.set_defaults(func=find_critical_paths)
+
+
+    def add_reverse_complements(args):
+        flat = FlatKmers.from_file(args.flat_kmers)
+        rev_comp_flat = flat.get_reverse_complement_flat_kmers(k=args.kmer_size)
+        flat = FlatKmers.from_multiple_flat_kmers([flat, rev_comp_flat])
+        flat.to_file(args.out_file_name)
+        logging.info("Saved new flat kmers with reverse complements to %s" % args.out_file_name)
+
+    subparser = subparsers.add_parser("add_reverse_complements")
+    subparser.add_argument("-f", "--flat-kmers", required=True)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.add_argument("-k", "--kmer-size", type=int, required=True)
+    subparser.set_defaults(func=add_reverse_complements)
+
+
+    def count_kmers(args):
+        from .kmer_counter import KmerCounter
+        counter = KmerCounter.from_flat_kmers(args.flat_kmers, args.modulo)
+        to_file(counter, args.out_file_name)
+        logging.info("Wrote counter to %s" % args.out_file_name)
+
+    subparser = subparsers.add_parser("count_kmers")
+    subparser.add_argument("-f", "--flat-kmers", required=True, type=FlatKmers.from_file)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.add_argument("-m", "--modulo", required=False, type=int, default=200000033)
+    subparser.set_defaults(func=count_kmers)
+
 
     if len(args) == 0:
         parser.print_help()
