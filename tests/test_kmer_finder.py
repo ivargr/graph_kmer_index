@@ -302,18 +302,46 @@ def test_find_kmers_from_position():
     )
     graph.set_numeric_node_sequences()
 
-    finder = DenseKmerFinder(graph, k=3)
+    finder = DenseKmerFinder(graph, k=3, only_store_nodes=set([2, 3]))
     finder.find_only_kmers_starting_at_position(1, 4)
     flat = finder.get_flat_kmers()
     index = KmerIndex2.from_flat_kmers(flat)
 
-    print(flat._hashes)
-    print(flat._start_offsets)
-    print(flat._start_nodes)
-    print(flat._nodes)
+    assert np.all(index.get_nodes(sequence_to_kmer_hash("CTG")) == [2])
+    assert np.all(index.get_nodes(sequence_to_kmer_hash("CTC")) == [3])
 
+    finder = DenseKmerFinder(graph, k=5, only_store_nodes=set([2, 3]))
+    finder.find_only_kmers_starting_at_position(1, 5)
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+    print(finder.kmers_found)
+
+    assert np.all(index.get_nodes(sequence_to_kmer_hash("TGGCA")) == [2])
+    assert np.all(index.get_nodes(sequence_to_kmer_hash("TCGCA")) == [3])
     #assert set(index.get_start_offsets(sequence_to_kmer_hash("CTG"))) == set([0])
 
+
+
+def test_special_case():
+    graph = Graph.from_dicts(
+        {1: "taacccctaacccctaaccctaaccctaac",
+         2: "", 3: "G", 4: "ccctaaccctaaccctaacccctaacccta"},
+        {1: [2, 3], 2: [4], 3: [4]},
+        [1, 4]
+    )
+    graph.set_numeric_node_sequences()
+
+    finder = DenseKmerFinder(graph, k=31, only_store_nodes=set([2, 3]))
+    finder.find_only_kmers_starting_at_position(1, 22)
+    flat = finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+
+    print(flat._hashes)
+
+    search = "accctaacccctaaccctaaccctaacccct"
+    hash = sequence_to_kmer_hash(search)
+    assert np.all(index.get_start_offsets(hash) == [22])
+    assert np.all(index.get_start_nodes(hash) == [4])
 
 very_simple_test()
 simple_test()
@@ -330,3 +358,4 @@ test_two_long_nodes2()
 test_snp_and_long_node()
 test_large_k()
 test_find_kmers_from_position()
+test_special_case()
