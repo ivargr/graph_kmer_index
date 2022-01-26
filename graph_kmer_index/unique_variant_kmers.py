@@ -25,6 +25,8 @@ class UniqueVariantKmersFinder:
         self.node_to_variants = node_to_variants
         self._use_dense_kmer_finder = use_dense_kmer_finder
         self._position_id_index = position_id_index
+        self._nodes_found = set()
+
         if self._use_dense_kmer_finder:
             assert self._position_id_index is not None, "Position id index must be set when using dense kmer finder"
 
@@ -48,19 +50,24 @@ class UniqueVariantKmersFinder:
         has_added = False
         # Start searching from before. The last position is probably the best for indels, since the sequence after is offset-ed.
         # We want to end on this, because this is what is chosen if all else fails
-        possible_ref_positions = [variant.position - i for i in range(1, self.k - 2)][::-1]
+        possible_ref_positions = [variant.position - i for i in range(2, self.k - 2)][::4][::-1]
         valid_positions_found = []
 
         for possible_ref_position in possible_ref_positions:
             possible_ref_position_adjusted = self.graph.convert_chromosome_ref_offset_to_graph_ref_offset(possible_ref_position, variant.chromosome)
             is_valid = True
+            only_store_nodes = set()
+            for n in (ref_node, variant_node):
+                if n not in self._nodes_found:
+                    only_store_nodes.add(n)
+
             if not self._use_dense_kmer_finder:
-                finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=self._max_variant_nodes, only_store_nodes=set([ref_node, variant_node]),
+                finder = SnpKmerFinder(self.graph, self.k, max_variant_nodes=self._max_variant_nodes, only_store_nodes=only_store_nodes,
                                        haplotype_matrix=self.haplotype_matrix, node_to_variants=self.node_to_variants, variant_to_nodes=self.variant_to_nodes)
                 finder.find_kmers_from_linear_ref_position(possible_ref_position_adjusted)
             else:
                 finder = DenseKmerFinder(self.graph, self.k, None, position_id=self._position_id_index,
-                                         max_variant_nodes=self._max_variant_nodes, only_store_nodes=set([ref_node, variant_node]),
+                                         max_variant_nodes=self._max_variant_nodes, only_store_nodes=only_store_nodes,
                                          )
                 node = self.graph.get_node_at_ref_offset(possible_ref_position_adjusted)
                 offset = self.graph.get_node_offset_at_ref_offset(possible_ref_position_adjusted)
@@ -101,6 +108,10 @@ class UniqueVariantKmersFinder:
             if is_valid:
                 # Kmers are valid, we don't need to search anymore for this variant
                 flat = finder.get_flat_kmers(v="1")
+                # hack for now: Set ref offset to be the ref offset we searched from
+                # new densekmerfinder uses end as ref offset
+                #flat._ref_offsets[:] = possible_ref_position_adjusted
+                assert len(set(flat._nodes)) <= 2
                 valid_positions_found.append(flat)
 
                 if flat.maximum_kmer_frequency(self._kmer_index_with_frequencies) <= 1:
@@ -111,13 +122,22 @@ class UniqueVariantKmersFinder:
                     logging.warning("Found 0 nodes for variant %s. Hashes: %s, ref positions: %s. Searched from ref position %d" % (variant, flat._hashes, flat._ref_offsets, possible_ref_position))
                     #raise Exception("No kmers found")
 
-                if ref_node not in flat._nodes:
+                if ref_node not in flat._nodes and ref_node in only_store_nodes:
                     logging.warning("Found kmers for variant %s with ref/variant nodes %d/%d but flat kmers does not contain ref node. Flat kmer nodes: %s. Searched from possition %d" % (variant, ref_node, variant_node, flat._nodes, possible_ref_position))
                     #raise Exception("No kmers found")
 
-                if variant_node not in flat._nodes:
-                    logging.warning("No variant node kmers found for variant %s with variant node %d and ref node %d" % (variant, variant_node, ref_node))
-                    logging.warning("Found no variant node kmers for variant %s. Hashes: %s, ref positions: %s. Searched from ref position %d" % (variant, flat._hashes, flat._ref_offsets, possible_ref_position))
+                if variant_node not in flat._nodes and variant_node in only_store_nodes:
+                    logging.warning("No variant node kmers found for variant %s with variant node %d and ref node %d" %
+                                    (variant, variant_node, ref_node))
+                    logging.warning("Found no variant node kmers for variant %s. Hashes: %s, ref positions: %s. Searched from ref position %d" %
+                                    (variant, flat._hashes, flat._ref_offsets, possible_ref_position))
+                    logging.warning("Found nodes: %s" % flat._nodes)
+                    logging.warning("Only store nodes: %s" % only_store_nodes)
+                    logging.warning("Searched from node/offset: %d/%d" % (
+                        self.graph.get_node_at_ref_offset(possible_ref_position),
+                        self.graph.get_node_offset_at_ref_offset(possible_ref_position)
+                    ))
+                    #raise Exception("Errror")
 
         # Sort positions by max kmer frequency
         if len(valid_positions_found) == 0:
@@ -130,6 +150,24 @@ class UniqueVariantKmersFinder:
 
         #valid_positions_found = sorted(valid_positions_found, key=lambda p: p.sum_of_kmer_frequencies(self._kmer_index_with_frequencies))
         best_position = valid_positions_found[0]
+        nodes_found_here = list(best_position._nodes)
+        if nodes_found_here.count(ref_node) > 1000 and False:
+            logging.warning("Ref node %d found %d times" % (ref_node, nodes_found_here.count(ref_node)))
+            logging.warning("Starting positions: %s" % possible_ref_positions)
+            logging.info("Nodes: %s" % best_position._nodes)
+            logging.info("Variant: %s" % variant)
+            logging.info("Nodse from all positions:")
+            for pos in valid_positions_found:
+                logging.info(pos._nodes)
+
+            assert False
+
+
+        for node in set(best_position._nodes):
+            assert node not in self._nodes_found, "Found node %d at variant %s (nodes %d/%d), but already found for previous variant" % \
+                                                  (node, variant, ref_node, variant_node)
+            self._nodes_found.add(node)
+
         self.flat_kmers_found.append(best_position)
 
 
@@ -137,8 +175,8 @@ class UniqueVariantKmersFinder:
         prev_time = time.time()
         for i, variant in enumerate(self.variants):
             n_processed = len(self.flat_kmers_found)
-            if i % 10000 == 0:
-                logging.info("%d/%d variants processed (time spent on previous 10000 variants: %.3f s). "
+            if i % 500 == 0:
+                logging.info("%d/%d variants processed (time spent on previous 500 variants: %.3f s). "
                              "Now on chromosome/ref pos %s/%d" % (i, len(self.variants), time.time()-prev_time, str(variant.chromosome), variant.position))
                 prev_time = time.time()
 

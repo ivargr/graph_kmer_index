@@ -229,7 +229,7 @@ class SnpKmerFinder:
         self._last_ref_pos_added = self._current_ref_offset
 
         self._kmers_found += 1
-        if len(self.kmers_found) < 200:
+        if len(self.kmers_found) < 500:
             # Only add to this when there is little data, only used for testing and debugging
             #loggign.info("------Added kmer with nodes %s" % nodes)
             self.kmers_found.append((kmer, nodes, self._current_ref_offset, hash))

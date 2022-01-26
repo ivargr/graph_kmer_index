@@ -12,6 +12,10 @@ class CriticalGraphPaths:
         self._index = np.zeros(np.max(self.nodes)+1, dtype=np.uint16)
         self._index[self.nodes] = self.offsets
 
+    @classmethod
+    def empty(cls):
+        return cls(np.array([]), np.array([]), np.array([]))
+
     def is_critical(self, node, offset):
         if self._index is None:
             logging.info("Making critical paths index")

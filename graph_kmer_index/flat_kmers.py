@@ -76,7 +76,7 @@ class FlatKmers:
             ref_offsets = np.array(ref_offsets, np.uint64)
 
         logging.info("Done making flat kmers")
-        return FlatKmers(np.array(hashes, dtype=np.uint64), np.array(nodes, np.uint32), ref_offsets, np.array(allele_frequencies, dtype=np.uint16))
+        return FlatKmers(np.array(hashes, dtype=np.uint64), np.array(nodes, np.uint32), ref_offsets, np.array(allele_frequencies, dtype=np.single))
 
     def sum_of_kmer_frequencies(self, kmer_index_with_frequencies):
         return sum([0] + [max(1, kmer_index_with_frequencies.get_frequency(int(kmer))) for kmer in self._hashes])

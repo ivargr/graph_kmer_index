@@ -284,11 +284,14 @@ def run_argument_parser(args):
     subparser.set_defaults(func=make_reference_kmer_index)
 
     def make_unique_variant_kmers_single_thread(variants, args):
+        args = object_from_shared_memory(args)
         #variant_to_nodes = from_shared_memory(VariantToNodes, "variant_to_nodes_shared"+r)
         variant_to_nodes = args["variant_to_nodes"]
 
         #kmer_index = from_shared_memory(CollisionFreeKmerIndex, "kmer_index_shared"+r)
         kmer_index = args["kmer_index"]
+        if kmer_index is None:
+            kmer_index = args["kmer_counter"]
 
         #graph = from_shared_memory(Graph, "graph_shared"+r)
         graph = args["graph"]
@@ -304,15 +307,24 @@ def run_argument_parser(args):
             node_to_variants = NodeToVariants.from_file(args.node_to_variants)
         """
 
+        use_dense_kmer_finder = False
+        if args["use_dense_kmer_finder"]:
+            use_dense_kmer_finder = True
+            logging.info("Will use dense kmer finder")
+
         finder = UniqueVariantKmersFinder(graph, variant_to_nodes, variants, args["kmer_size"], args["max_variant_nodes"],
                                           kmer_index_with_frequencies=kmer_index, haplotype_matrix=haplotype_matrix,
                                           node_to_variants=node_to_variants,
-                                          do_not_choose_lowest_frequency_kmers=args["do_not_choose_lowest_frequency_kmers"])
+                                          do_not_choose_lowest_frequency_kmers=args["do_not_choose_lowest_frequency_kmers"],
+                                          use_dense_kmer_finder=use_dense_kmer_finder,
+                                          position_id_index=args["position_id_index"]
+                                          )
         flat_kmers = finder.find_unique_kmers()
         return flat_kmers
 
     def make_unique_variant_kmers(args):
         args = vars(args)
+        args_orig = args
         args.pop("func")  # necessary for putting args in shared memory
 
         logging.info("Reading all variants")
@@ -321,13 +333,14 @@ def run_argument_parser(args):
         pool = Pool(args["n_threads"])
 
         all_flat_kmers = []
+        args = object_to_shared_memory(args)
         for flat_kmers in pool.starmap(make_unique_variant_kmers_single_thread, zip(variants, repeat(args))):
             all_flat_kmers.append(flat_kmers)
 
         logging.info("Merge all flat kmers")
         merged_flat = FlatKmers.from_multiple_flat_kmers(all_flat_kmers)
-        merged_flat.to_file(args["out_file_name"])
-        logging.info("Wrote to file %s" % args["out_file_name"])
+        merged_flat.to_file(args_orig["out_file_name"])
+        logging.info("Wrote to file %s" % args_orig["out_file_name"])
 
     subparser = subparsers.add_parser("make_unique_variant_kmers", help="Make a reverse variant index lookup to unique kmers on that variant")
     subparser.add_argument("-g", "--graph", required=True, type=Graph.from_file)
@@ -337,6 +350,8 @@ def run_argument_parser(args):
     subparser.add_argument("-k", "--kmer-size", required=True, type=int)
     subparser.add_argument("-i", "--kmer-index", required=False, help="Kmer index used to check frequency of kmers in genome", type=CollisionFreeKmerIndex.from_file)
     subparser.add_argument("-I", "--kmer-counter", required=False, help="Kmer index used to check frequency of kmers in genome", type=from_file)
+    subparser.add_argument("-p", "--position-id-index", required=False, type=from_file)
+    subparser.add_argument("-D", "--use-dense-kmer-finder", required=False, type=bool, default=False)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-v", "--vcf", required=True)
     subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
@@ -418,12 +433,13 @@ def run_argument_parser(args):
         args, chunk = data
         args = object_from_shared_memory(args)
 
+        assert len(args["graph"].numeric_node_sequences) > 0
 
         logging.info("Processing chunk %s" % str(chunk))
         t = time.perf_counter()
         kmer_finder = DenseKmerFinder(args["graph"], args["kmer_size"], critical_graph_paths=args["critical_graph_paths"],
                                       position_id=args["position_id"],
-                                      max_variant_nodes=5,
+                                      max_variant_nodes=args["max_variant_nodes"],
                                       only_save_one_node_per_kmer=True,
                                       start_at_critical_path_number=chunk[0],
                                       stop_at_critical_path_number=chunk[1],
@@ -435,11 +451,13 @@ def run_argument_parser(args):
     def index(args):
         pool = get_shared_pool(args.n_threads)
 
-        critical_paths = None
         if args.critical_graph_paths is None:
+            logging.info("Making critical graph paths since not specified")
             args.critical_paths = CriticalGraphPaths.from_graph(graph, args.k)
 
-        args.position_id = PositionId.from_graph(graph) if args.position_id is not None else None
+        args.position_id = PositionId.from_graph(args.graph) if args.position_id is not None else None
+
+        assert len(args.graph.numeric_node_sequences) > 0
 
         args = vars(args)
         args.pop("func")
@@ -462,12 +480,19 @@ def run_argument_parser(args):
         flat_kmers = []
         for results in pool.imap(index_single_thread, zip(itertools.repeat(args_shared), chunks)):
             flat_kmers.append(results)
-            logging.info("Done with chunk")
+            logging.info("Done with chunk. Found %d kmers" % (len(results._hashes)))
 
         logging.info("Time spent to make indexes: %.2f" % (time.perf_counter()-t))
         close_shared_pool()
 
         flat_kmers = FlatKmers.from_multiple_flat_kmers(flat_kmers)
+        logging.info("N kmers in flat kmers: %d" % len(flat_kmers._hashes))
+        if args["include_reverse_complement"]:
+            logging.info("Adding reverse complements")
+            revcomp_flat_kmers = flat_kmers.get_reverse_complement_flat_kmers(args["kmer_size"])
+            flat_kmers = FlatKmers.from_multiple_flat_kmers([flat_kmers, revcomp_flat_kmers])
+            logging.info("N kmers in flat kmers after revcomp added: %d" % len(flat_kmers._hashes))
+
         flat_kmers.to_file(args["out_file_name"])
         logging.info("Wrote final FlatKmers to %s" % args["out_file_name"])
 
@@ -480,6 +505,9 @@ def run_argument_parser(args):
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-t", "--n-threads", required=False, type=int, default=1)
     subparser.add_argument("-w", "--whitelist", required=False, type=lambda e: set(FlatKmers.from_file(e)._hashes), help="Only store kmers that are in the whitelist")
+    subparser.add_argument("-r", "--include-reverse-complement", required=False, type=bool, default=False)
+    subparser.add_argument("-O", "--only-save-one-node-per-kmer", required=False, type=bool, default=False)
+    subparser.add_argument("-v", "--max-variant-nodes", required=False, type=int, default=5, help="Max variant nodes allowed in kmer.")
     subparser.set_defaults(func=index)
 
 
@@ -487,6 +515,7 @@ def run_argument_parser(args):
         from .critical_graph_paths import CriticalGraphPaths
         graph = Graph.from_file(args.graph)
         critical_paths = CriticalGraphPaths.from_graph(graph, args.kmer_size)
+        critical_paths._make_index()
         to_file(critical_paths, args.out_file_name)
         logging.info("Wrote to file %s" % args.out_file_name)
 

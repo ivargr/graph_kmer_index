@@ -31,7 +31,7 @@ class MinimalKmerIndex:
         self._n_kmers = n_kmers.astype(np.uint32)
         self._nodes = nodes.astype(np.uint32)
         self._kmers = kmers
-        self._modulo = modulo
+        self._modulo = np.int64(modulo)
 
     def max_node_id(self):
         return np.max(self._nodes)
@@ -164,7 +164,7 @@ class CollisionFreeKmerIndex:
         self._ref_offsets = _ref_offsets
         self._kmers = _kmers  # Actual numeric kmers (not hashes of numeric kmers) at each position
                              # used to filter out collisions
-        self._modulo = _modulo
+        self._modulo = int(_modulo)
         if _frequencies is None:
             self._frequencies = 0
         else:

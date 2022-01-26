@@ -43,7 +43,7 @@ class DenseKmerFinder:
         self._start_offsets = NumpyList(dtype=np.int16)
         self._nodes = NumpyList(dtype=np.int32)
         self._kmers = NumpyList(dtype=np.int64)
-        self._allele_frequencies = NumpyList(np.float)
+        self._allele_frequencies = NumpyList(dtype=np.float)
         
         self._power_vector = np.power(4, np.arange(0, k, dtype=np.uint64))
 
@@ -91,6 +91,7 @@ class DenseKmerFinder:
             logging.info("Will limit kmers to whitelist (%d kmers in whitelist)" % len(whitelist))
 
     def get_flat_kmers(self, v="2"):
+        assert self._allele_frequencies.get_nparray().dtype == np.float
         if v == "0" or v == "1":
             #logging.info("Converting start nodes/offsets to an iD to be compatible with FlatKmers")
             # return old version, convert start nodes and offsets to a position id
@@ -235,13 +236,7 @@ class DenseKmerFinder:
 
     def search_from(self, node, offset, current_hash):
 
-        if self._early_stop and len(self._current_bases)-self._current_path_start_position >= self._k:
-            #logging.info(self._current_path_start_position)
-            #logging.info(len(self._current_bases))
-            #logging.info("Node: %d,j offset: %d" % (node, offset))
-            self._recursion_depth -= 1
-            return
-            #raise Exception("Something wrong, did not early stop")
+        assert self._allele_frequencies._dtype == np.float, self._allele_frequencies._dtype
 
         self._recursion_depth += 1
         node_size = self._graph.get_node_size(node)
@@ -284,12 +279,15 @@ class DenseKmerFinder:
             self._current_nodes.append(node)
             self._nonempty_bases_traversed += 1
 
-            if True or ((node < 100 and offset < 15) or (offset > 0 and offset % 10000 == 0) or node % 10000 == 0):
-                logging.info("On node %d/%d, offset %d, %d kmers added. Skipped nodes: %d. current hash %d, first base: %d. "
-                             "Path length: %d. Recusion depth: %d. Nonempty bases traversed: %d"
+            assert self._nonempty_bases_traversed <= len(self._current_bases)
+
+            if False and ((node < 100 and offset < 15) or (offset > 0 and offset % 10000 == 0) or node % 10000 == 0):
+                logging.info("On node %d/%d, offset %d, %d kmers added. Skipped nodes: %d. "
+                             "Path length: %d. Rec depth: %d. Nonempty traversed: %d. Nodes: %s"
                              % (node, len(self._graph.nodes), offset, len(self._kmers),
-                                self._n_nodes_skipped_because_too_complex, current_hash, first_base,
-                                len(self._current_bases), self._recursion_depth, self._nonempty_bases_traversed))
+                                self._n_nodes_skipped_because_too_complex,
+                                len(self._current_bases), self._recursion_depth, self._nonempty_bases_traversed,
+                                ",".join((str(b) for b in np.unique(self._current_nodes[self._current_path_start_position:])))))
                 #logging.info("Current search start node/offset: %d/%d" % (self._current_search_start_node, self._current_search_start_offset))
 
             current_path_desc = (node, offset, frozenset(self._current_nodes[self._current_path_start_position:]))
@@ -353,7 +351,7 @@ class DenseKmerFinder:
         self._nodes.extend(np.zeros(n) + node)
         self._start_nodes.extend(np.zeros(n) + node)
         self._start_offsets.extend(offsets_to_add)
-        self._allele_frequencies.extend(np.zeros(n) + self._graph.get_node_allele_frequency(node))
+        self._allele_frequencies.extend(np.zeros(n, dtype=np.float) + self._graph.get_node_allele_frequency(node))
 
         # continue search from next offset and stop this search
         # NB: Converting to python int's to avoid problems when working with these hashes further
@@ -378,15 +376,19 @@ class DenseKmerFinder:
                 assert len(next_nodes) == 1
                 self._n_nodes_skipped_because_too_complex -= len(next_nodes)
 
+            #logging.info("Next nodes: %s" % next_nodes)
             for i, next_node in enumerate(next_nodes):
+                #logging.info("   Continuing on node %s. Nonempty bases: %d" % (next_node, self._nonempty_bases_traversed))
                 path_start = self._current_path_start_position  # copy path start position before continuing recursion
                 n_bases_in_path = len(self._current_bases)
+                nonempty_bases_copy = self._nonempty_bases_traversed+0
                 self.search_from(next_node, 0, current_hash)
 
                 # after processing a child, reset current bases and nodes to where we are now before procesing next child
                 self._current_bases.set_n_elements(n_bases_in_path)
                 self._current_nodes.set_n_elements(n_bases_in_path)
                 self._current_path_start_position = path_start
+                self._nonempty_bases_traversed = nonempty_bases_copy
 
     def _get_first_base_in_path(self):
         #if len(self._current_bases) >= self._k:
@@ -395,7 +397,6 @@ class DenseKmerFinder:
             first_base = self._current_bases[self._current_path_start_position]
 
             # check if "dummy bases" are coming, then we want to skip them for the next iteration
-            print(self._current_bases)
             if len(self._current_bases) > self._current_path_start_position+1:
                 next_first_base = self._current_bases[self._current_path_start_position + 1]
                 while next_first_base == -1:
