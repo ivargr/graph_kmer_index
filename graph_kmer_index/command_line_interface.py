@@ -76,7 +76,7 @@ def create_index_single_thread(args, interval=None):
         skip_kmers_with_nodes = set(f._nodes)
 
     finder = SnpKmerFinder(graph, k=args.kmer_size, spacing=args.spacing,
-                           include_reverse_complements=args.include_reverse_complement,
+                           include_reverse_complements=False,  # always false, adds revcomp in the end if chosen
                            pruning=args.pruning,
                            max_kmers_same_position=args.max_kmers_same_position,
                            max_frequency=args.max_frequency,
@@ -91,6 +91,12 @@ def create_index_single_thread(args, interval=None):
                            reference=reference)
 
     kmers = finder.find_kmers()
+
+    if args.include_reverse_complement:
+        logging.info("Adding reverse complements")
+        kmer_revcomp = kmers.get_reverse_complement_flat_kmers(args.kmer_size)
+        kmers = FlatKmers.from_multiple_flat_kmers([kmers, kmers_revcomp])
+
     return kmers
 
 def create_index(args):
