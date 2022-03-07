@@ -27,12 +27,15 @@ from shared_memory_wrapper import get_shared_pool, close_shared_pool
 from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
 from obgraph.haplotype_matrix import HaplotypeMatrix
 from npstructures import HashTable, Counter
+from npstructures.npset import NpSet
 from .collision_free_kmer_index import CounterKmerIndex
 from .kmer_finder import DenseKmerFinder
 from .collision_free_kmer_index import KmerIndex2
 from .critical_graph_paths import CriticalGraphPaths
 from shared_memory_wrapper import to_file, from_file
 from obgraph.position_id import PositionId
+
+from kmer_mapper.util import log_memory_usage_now
 
 
 def main():
@@ -94,7 +97,9 @@ def create_index_single_thread(args, interval=None):
 
     if args.include_reverse_complement:
         logging.info("Adding reverse complements")
-        kmer_revcomp = kmers.get_reverse_complement_flat_kmers(args.kmer_size)
+        log_memory_usage_now("before adding reverse complements")
+        kmers_revcomp = kmers.get_reverse_complement_flat_kmers(args.kmer_size)
+        log_memory_usage_now("after adding reverse complements")
         kmers = FlatKmers.from_multiple_flat_kmers([kmers, kmers_revcomp])
 
     return kmers
@@ -111,14 +116,15 @@ def create_index(args):
         kmers = create_index_single_thread(args)
         kmers.to_file(args.out_file_name)
     else:
-        logging.info("Making pool with %d workers" % args.threads)
+        n_jobs = args.threads * 10
+        logging.info("Making pool with %d workers" % n_jobs)
         pool = Pool(args.threads)
         genome_size = args.genome_size
         n_total_start_positions = genome_size // args.spacing
-        n_positions_each_process = n_total_start_positions // args.threads
+        n_positions_each_process = n_total_start_positions // n_jobs
         logging.info("Using genome size %d. Will process %d genome positions in each process." % (genome_size, n_positions_each_process))
         intervals = []
-        for i in range(args.threads):
+        for i in range(n_jobs):
             start_position = n_positions_each_process * i * args.spacing
             end_position = n_positions_each_process * (i+1) * args.spacing
             intervals.append((start_position, end_position))
@@ -442,6 +448,8 @@ def run_argument_parser(args):
         assert len(args["graph"].numeric_node_sequences) > 0
 
         logging.info("Processing chunk %s" % str(chunk))
+        log_memory_usage_now(str(chunk))
+
         t = time.perf_counter()
         kmer_finder = DenseKmerFinder(args["graph"], args["kmer_size"], critical_graph_paths=args["critical_graph_paths"],
                                       position_id=args["position_id"],
@@ -451,8 +459,12 @@ def run_argument_parser(args):
                                       stop_at_critical_path_number=chunk[1],
                                       whitelist=args["whitelist"])
         kmer_finder.find()
-        return kmer_finder.get_flat_kmers(v="1")
         logging.info("Took %d sec to find kmers" % (time.perf_counter()-t))
+        res = kmer_finder.get_flat_kmers(v="1")
+        if len(np.where(res._hashes == 979349781162838629)[0]) > 0:
+            logging.info("FOUND MATCH! %d/%d" % (chunk[0], chunk[1]))
+
+        return res
 
     def index(args):
         pool = get_shared_pool(args.n_threads)
@@ -467,16 +479,23 @@ def run_argument_parser(args):
 
         args = vars(args)
         args.pop("func")
+        log_memory_usage_now("Before shared memory")
         args_shared = object_to_shared_memory(args)
+        log_memory_usage_now("After shared memory")
         critical_paths = args["critical_graph_paths"]
 
-        n_chunks = args["n_threads"]*3
+        n_chunks = args["n_threads"]*20
+        if n_chunks >= len(critical_paths):
+            n_chunks = len(critical_paths)
 
-        assert n_chunks < len(critical_paths), "Too many threads for data. Try with fewer"
+        assert n_chunks <= len(critical_paths), "Too many threads for data. Try with fewer"
 
         logging.info("There are %d critical paths" % len(critical_paths))
+        logging.info("Will process these in %d chunks" % n_chunks)
+        n_paths_per_chunk = len(critical_paths) // n_chunks
+        logging.info("N paths per chunk: %d" % n_paths_per_chunk)
 
-        starting_indexes = list(range(0, len(critical_paths), len(critical_paths)//n_chunks))
+        starting_indexes = list(range(0, len(critical_paths), n_paths_per_chunk))
         ending_indexes = starting_indexes[1:] + [len(critical_paths)]
         chunks = list((s, e) for s, e in zip(starting_indexes, ending_indexes))
 
@@ -484,9 +503,10 @@ def run_argument_parser(args):
 
         t = time.perf_counter()
         flat_kmers = []
-        for results in pool.imap(index_single_thread, zip(itertools.repeat(args_shared), chunks)):
+        for i, results in enumerate(pool.imap(index_single_thread, zip(itertools.repeat(args_shared), chunks))):
             flat_kmers.append(results)
             logging.info("Done with chunk. Found %d kmers" % (len(results._hashes)))
+            log_memory_usage_now("Done with chunk %d" % i)
 
         logging.info("Time spent to make indexes: %.2f" % (time.perf_counter()-t))
         close_shared_pool()
@@ -510,7 +530,8 @@ def run_argument_parser(args):
     subparser.add_argument("-k", "--kmer-size", type=int, default=31, required=False)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-t", "--n-threads", required=False, type=int, default=1)
-    subparser.add_argument("-w", "--whitelist", required=False, type=lambda e: set(FlatKmers.from_file(e)._hashes), help="Only store kmers that are in the whitelist")
+    #subparser.add_argument("-w", "--whitelist", required=False, type=lambda e: NpSet(FlatKmers.from_file(e)._hashes), help="Only store kmers that are in the whitelist")
+    subparser.add_argument("-w", "--whitelist", required=False, type=lambda e: CollisionFreeKmerIndex.from_file(e), help="Only store kmers that are in the whitelist")
     subparser.add_argument("-r", "--include-reverse-complement", required=False, type=bool, default=False)
     subparser.add_argument("-O", "--only-save-one-node-per-kmer", required=False, type=bool, default=False)
     subparser.add_argument("-v", "--max-variant-nodes", required=False, type=int, default=5, help="Max variant nodes allowed in kmer.")
@@ -548,7 +569,7 @@ def run_argument_parser(args):
 
     def count_kmers(args):
         from .kmer_counter import KmerCounter
-        counter = KmerCounter.from_flat_kmers(args.flat_kmers, args.modulo)
+        counter = KmerCounter.from_flat_kmersv2(args.flat_kmers, args.modulo, args.subsample_ratio)
         to_file(counter, args.out_file_name)
         logging.info("Wrote counter to %s" % args.out_file_name)
 
@@ -556,6 +577,7 @@ def run_argument_parser(args):
     subparser.add_argument("-f", "--flat-kmers", required=True, type=FlatKmers.from_file)
     subparser.add_argument("-o", "--out-file-name", required=True)
     subparser.add_argument("-m", "--modulo", required=False, type=int, default=200000033)
+    subparser.add_argument("-s", "--subsample-ratio", required=False, type=int, default=1, help="1 to keep every kmer, 2 for every other etc")
     subparser.set_defaults(func=count_kmers)
 
 

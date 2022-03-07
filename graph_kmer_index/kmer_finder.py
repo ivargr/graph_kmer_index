@@ -4,6 +4,7 @@ from .flat_kmers import FlatKmers2, FlatKmers
 from .critical_graph_paths import CriticalGraphPaths
 from npstructures.numpylist import NumpyList
 import sys
+sys.setrecursionlimit(20000)
 from obgraph.position_id import PositionId
 
 def update_hash(current_base, current_hash, first_base, k, only_add=False):
@@ -88,7 +89,7 @@ class DenseKmerFinder:
         self._whitelist = None
         if whitelist is not None:
             self._whitelist = whitelist
-            logging.info("Will limit kmers to whitelist (%d kmers in whitelist)" % len(whitelist))
+            #logging.info("Will limit kmers to whitelist (%d kmers in whitelist)" % len(whitelist))
 
     def get_flat_kmers(self, v="2"):
         assert self._allele_frequencies.get_nparray().dtype == np.float
@@ -98,11 +99,6 @@ class DenseKmerFinder:
             start_nodes = self._start_nodes.get_nparray()
             start_offsets = self._start_offsets.get_nparray()
             if v == "1":
-                if 387403581970809174 in self._kmers.get_nparray():
-                    pos = np.where(self._kmers.get_nparray() == 387403581970809174)[0]
-                    logging.info("Kmers: %s" % self._kmers.get_nparray())
-                    logging.warning("START NODE: %d START OFFSET: %d" % (start_nodes[pos], start_offsets[pos]))
-                    assert False
                 ref_offsets = self._position_id.get(start_nodes, start_offsets)
             else:
                 ref_offsets = self._graph.node_to_ref_offset[start_nodes]+start_offsets
@@ -119,10 +115,6 @@ class DenseKmerFinder:
         if self._whitelist is not None and kmer not in self._whitelist:
             self._n_skipped_whitelist += 1
             return
-
-        if kmer == 387403581970809174:
-            logging.info("Adding kmer %d at %d/%d" % (kmer, start_node, start_offset))
-            logging.info("Bases in path: %s" % self._current_bases[self._current_path_start_position:])
 
         nodes = np.unique(self._current_nodes[self._current_path_start_position:])
         #logging.info("     Adding kmer %d at node/offset %d/%d with nodes %s. Start node/offset: %d/%d" %
@@ -221,7 +213,14 @@ class DenseKmerFinder:
             if critical_offset >= self._k-1:
                 critical_offset -= (self._k-1)
 
-            self.search_from(critical_node, critical_offset, 0)
+            try:
+                self.search_from(critical_node, critical_offset, 0)
+            except RecursionError:
+                logging.error("Failed searching from critical node %d and position %d" % (critical_node, critical_offset))
+                logging.error("The graph might be too complex. Try setting max variants nodes lower?")
+                logging.error("Recursion depth: %d" % self._recursion_depth)
+                logging.error("Starting at critical path number: %d" % self._start_at_critical_path_number)
+                raise
 
         logging.info("N nodes skipped because too many variant nodes: %d" % self._n_nodes_skipped_because_too_complex)
         logging.info("N skipped because whitelist: %d" % self._n_skipped_whitelist)
@@ -281,7 +280,7 @@ class DenseKmerFinder:
 
             assert self._nonempty_bases_traversed <= len(self._current_bases)
 
-            if False and ((node < 100 and offset < 15) or (offset > 0 and offset % 10000 == 0) or node % 10000 == 0):
+            if False and ((node < 100 and offset < 15) or (offset > 0 and offset % 5000 == 0) or node % 5000 == 0):
                 logging.info("On node %d/%d, offset %d, %d kmers added. Skipped nodes: %d. "
                              "Path length: %d. Rec depth: %d. Nonempty traversed: %d. Nodes: %s"
                              % (node, len(self._graph.nodes), offset, len(self._kmers),

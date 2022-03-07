@@ -175,8 +175,8 @@ class UniqueVariantKmersFinder:
         prev_time = time.time()
         for i, variant in enumerate(self.variants):
             n_processed = len(self.flat_kmers_found)
-            if i % 500 == 0:
-                logging.info("%d/%d variants processed (time spent on previous 500 variants: %.3f s). "
+            if i % 5000 == 0:
+                logging.info("%d/%d variants processed (time spent on previous 5000 variants: %.3f s). "
                              "Now on chromosome/ref pos %s/%d" % (i, len(self.variants), time.time()-prev_time, str(variant.chromosome), variant.position))
                 prev_time = time.time()
 
