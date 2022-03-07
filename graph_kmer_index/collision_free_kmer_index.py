@@ -249,6 +249,9 @@ class CollisionFreeKmerIndex:
             assert count > 0, "Count is not > 0 for kmer %d, start, end: %d,%d. Ref offsets: %s" % (kmer, start, end, self._ref_offsets[hit_positions + start])
             self._frequencies[hit_positions + start] = count
 
+    def __contains__(self, item):
+        return self.get(int(item), 100000000000)[0] is not None
+
     def get(self, kmer, max_hits=10):
         hash = kmer % self._modulo
         position = self._hashes_to_index[hash]
