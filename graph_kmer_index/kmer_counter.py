@@ -1,6 +1,5 @@
 import logging
 import time
-from kmer_mapper.util import log_memory_usage_now
 
 
 from npstructures import Counter, HashTable
@@ -47,7 +46,6 @@ class KmerCounter:
         t = time.perf_counter()
         for i, chunk in enumerate(np.array_split(kmers, 1 + len(kmers) // chunk_size)):
             logging.info("Counting chunk %d" % i)
-            log_memory_usage_now("Chunk %d" % i)
             counter.count(chunk)
 
         #counter.count(kmers)

@@ -35,7 +35,6 @@ from .critical_graph_paths import CriticalGraphPaths
 from shared_memory_wrapper import to_file, from_file
 from obgraph.position_id import PositionId
 
-from kmer_mapper.util import log_memory_usage_now
 
 
 def main():
@@ -97,9 +96,7 @@ def create_index_single_thread(args, interval=None):
 
     if args.include_reverse_complement:
         logging.info("Adding reverse complements")
-        log_memory_usage_now("before adding reverse complements")
         kmers_revcomp = kmers.get_reverse_complement_flat_kmers(args.kmer_size)
-        log_memory_usage_now("after adding reverse complements")
         kmers = FlatKmers.from_multiple_flat_kmers([kmers, kmers_revcomp])
 
     return kmers
@@ -445,7 +442,6 @@ def run_argument_parser(args):
         args, chunk = data
         args = object_from_shared_memory(args)
         logging.info("Processing chunk %s" % str(chunk))
-        log_memory_usage_now(str(chunk))
 
         t = time.perf_counter()
         kmer_finder = DenseKmerFinder(args["graph"], args["kmer_size"], critical_graph_paths=args["critical_graph_paths"],
@@ -474,9 +470,7 @@ def run_argument_parser(args):
 
         args = vars(args)
         args.pop("func")
-        log_memory_usage_now("Before shared memory")
         args_shared = object_to_shared_memory(args)
-        log_memory_usage_now("After shared memory")
         critical_paths = args["critical_graph_paths"]
 
         n_chunks = args["n_threads"]*20
@@ -501,7 +495,6 @@ def run_argument_parser(args):
         for i, results in enumerate(pool.imap(index_single_thread, zip(itertools.repeat(args_shared), chunks))):
             flat_kmers.append(results)
             logging.info("Done with chunk. Found %d kmers" % (len(results._hashes)))
-            log_memory_usage_now("Done with chunk %d" % i)
 
         logging.info("Time spent to make indexes: %.2f" % (time.perf_counter()-t))
         close_shared_pool()
