@@ -52,13 +52,15 @@ def test3():
 
 def test4():
     graph = Graph.from_dicts(
-        {0: "A", 1: "CTTT", 2: "TAAGGGG", 3: "AAA"},
-        {0: [1], 1: [2], 2: [3], 1: [3]},
+        {0: "A", 1: "CTTT", 2: "TAAGGGG", 3: "AA", 4: ""},
+        {0: [1], 1: [2, 4], 2: [3], 4: [3]},
         [0, 1, 2, 3]
     )
 
     k = 3
     c = CriticalGraphPaths.from_graph(graph, k)
+    print(c.nodes)
+    print(c.offsets)
     assert np.all(c.nodes == [1])
     assert np.all(c.offsets == [1])
 
@@ -92,9 +94,9 @@ def test6():
     assert np.all(c.offsets == [2])
 
 
-test()
-test2()
-test3()
+#test()
+#test2()
+#test3()
 test4()
-test5()
-test6()
+#test5()
+#test6()

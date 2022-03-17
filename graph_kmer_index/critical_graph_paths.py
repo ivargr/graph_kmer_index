@@ -9,6 +9,10 @@ class CriticalGraphPaths:
         self._index = index
 
     def _make_index(self):
+        if len(self.nodes) == 0:
+            self._index = np.zeros(0)
+            return
+
         self._index = np.zeros(np.max(self.nodes)+1, dtype=np.uint16)
         self._index[self.nodes] = self.offsets
 
@@ -19,6 +23,7 @@ class CriticalGraphPaths:
     def is_critical(self, node, offset):
         if self._index is None:
             logging.info("Making critical paths index")
+            logging.info("NOdes: %s, offsets: %s" % (self.nodes, self.offsets))
             self._make_index()
 
         if node >= len(self._index):
@@ -61,7 +66,7 @@ class CriticalGraphPaths:
                     #print("Resetting bp since last join, Prev depth: %d" % prev_depth)
                     bp_since_last_join = 0
 
-                #print("Node %d, depth %d. Bp since last join: %d" % (current_node, depth, bp_since_last_join))
+                print("Node %d, depth %d. Bp since last join: %d" % (current_node, depth, bp_since_last_join))
 
                 node_size = graph.get_node_size(current_node)
 
@@ -70,7 +75,7 @@ class CriticalGraphPaths:
                     if bp_since_last_join <= k and bp_since_last_join + node_size >= k:
                         # we have a critical path point somewhere on this node
                         critical_nodes.append(current_node)
-                        #print("  adding node %d offset %d. Bp since last join is now %d" % (current_node, k-bp_since_last_join-1, bp_since_last_join))
+                        print("  adding node %d offset %d. Bp since last join is now %d" % (current_node, k-bp_since_last_join-1, bp_since_last_join))
                         critical_offsets.append(k - bp_since_last_join-1)
                         #bp_since_last_join += node_size
 

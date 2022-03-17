@@ -13,12 +13,15 @@ def very_simple_test():
         {0: [1, 2], 2: [3], 1: [3]},
         [0, 1, 3]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
+    print("Kmers found: %s" % finder.kmers_found)
 
-    index = KmerIndex2.from_flat_kmers(flat)
+    print(flat._hashes)
+
+    index = KmerIndex2.from_flat_kmers(flat, modulo=15)
+
 
     assert np.all(index.get_nodes(sequence_to_kmer_hash("ATA")) == [0, 2, 3])
     assert np.all(index.get_start_nodes(sequence_to_kmer_hash("ATA")) == [3, 3, 3])
@@ -40,7 +43,6 @@ def simple_test():
         {0: [1, 2], 2: [3], 1: [3], 3: [4, 5], 4: [6], 5: [6]},
         [0, 1, 3, 4, 6]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -60,7 +62,6 @@ def test_nested_paths():
         {0: [1, 2, 7], 1: [3], 2: [3], 3: [4, 5], 4: [6], 5: [6], 7: [6]},
         [0, 1, 3, 4, 6]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -75,7 +76,6 @@ def test_long_node():
         {1: [2, 3], 2: [4], 3: [4]},
         [1, 2, 4]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -91,7 +91,6 @@ def test_empty_dummy_nodes():
         {1: [2, 3], 3: [4], 2: [4]},
         [1, 2, 4]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -108,7 +107,6 @@ def test_empty_dummy_nodes2():
         {1: [2], 2: [3]},
         [1, 3]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -127,7 +125,6 @@ def test_empty_dummy_nodes3():
         {1: [2], 2: [3], 3: [4]},
         [1, 2, 4]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -146,7 +143,6 @@ def test_graph_with_multiple_critical_points():
         {1: [2, 3], 2: [4], 3: [4], 4: [5, 6], 5: [7], 6: [7], 7: [8, 9], 8: [10], 9: [10]},
         [1, 2, 4, 7, 8, 10]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -166,7 +162,6 @@ def test_two_long_nodes():
         {1: [2]},
         [1, 2]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -185,7 +180,6 @@ def test_two_long_nodes2():
         {1: [2]},
         [1, 2]
     )
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=5)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -213,7 +207,6 @@ def test_neighbouring_dummy_nodes():
         [1, 5, 6]
     )
 
-    graph.set_numeric_node_sequences()
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
@@ -233,7 +226,6 @@ def test_max_variant_nodes():
         {1: [2, 3], 2: [4, 5], 3: [4, 5], 4: [6], 5: [6]},
         [1, 5, 6]
     )
-    graph.set_numeric_node_sequences()
 
     max_variant_nodes = 0
     finder = DenseKmerFinder(graph, k=3, max_variant_nodes=max_variant_nodes)
@@ -267,7 +259,6 @@ def test_snp_and_long_node():
         {1: [2, 3], 2: [4], 3: [4]},
         [1, 2, 4]
     )
-    graph.set_numeric_node_sequences()
 
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
@@ -285,7 +276,6 @@ def test_large_k():
         {1: [2, 3], 2: [4], 3: [4]},
         [1, 2, 4]
     )
-    graph.set_numeric_node_sequences()
 
     finder = DenseKmerFinder(graph, k=31)
     finder.find()
@@ -300,7 +290,6 @@ def test_find_kmers_from_position():
         {1: [2, 3], 2: [4], 3: [4]},
         [1, 2, 4]
     )
-    graph.set_numeric_node_sequences()
 
     finder = DenseKmerFinder(graph, k=3, only_store_nodes=set([2, 3]))
     finder.find_only_kmers_starting_at_position(1, 4)
@@ -329,7 +318,6 @@ def test_special_case():
         {1: [2, 3], 2: [4], 3: [4]},
         [1, 4]
     )
-    graph.set_numeric_node_sequences()
 
     finder = DenseKmerFinder(graph, k=31, only_store_nodes=set([2, 3]))
     finder.find_only_kmers_starting_at_position(1, 22)
@@ -352,7 +340,6 @@ def test_indel():
         {1: [2, 3], 2: [4], 3: [4]},
         [1, 4]
     )
-    graph.set_numeric_node_sequences()
 
     finder = DenseKmerFinder(graph, k=9, only_store_nodes=set([2, 3]))
     finder.find_only_kmers_starting_at_position(1, 2)
@@ -370,7 +357,6 @@ def test_snp_and_indel():
         {1: [3, 2], 2: [4], 3: [4], 4: [5, 6], 5: [7], 6: [7]},
         [1, 2, 4, 6, 7]
     )
-    graph.set_numeric_node_sequences()
 
     finder = DenseKmerFinder(graph, k=13, only_store_nodes=set([5, 6]), max_variant_nodes=5)
     finder.find_only_kmers_starting_at_position(1, 6)

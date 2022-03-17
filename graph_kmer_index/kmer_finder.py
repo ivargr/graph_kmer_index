@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from .flat_kmers import FlatKmers2, FlatKmers
 from .critical_graph_paths import CriticalGraphPaths
-from npstructures.numpylist import NumpyList
+from .nplist import NpList
 import sys
 sys.setrecursionlimit(20000)
 from obgraph.position_id import PositionId
@@ -40,19 +40,19 @@ class DenseKmerFinder:
         self._k = k
         self._only_save_one_node_per_kmer = only_save_one_node_per_kmer
         self._max_variant_nodes = max_variant_nodes
-        self._start_nodes = NumpyList(dtype=np.int32)
-        self._start_offsets = NumpyList(dtype=np.int16)
-        self._nodes = NumpyList(dtype=np.int32)
-        self._kmers = NumpyList(dtype=np.int64)
-        self._allele_frequencies = NumpyList(dtype=np.float)
+        self._start_nodes = NpList(dtype=np.int32)
+        self._start_offsets = NpList(dtype=np.int16)
+        self._nodes = NpList(dtype=np.int32)
+        self._kmers = NpList(dtype=np.int64)
+        self._allele_frequencies = NpList(dtype=float)
         
         self._power_vector = np.power(4, np.arange(0, k, dtype=np.uint64))
 
         self._current_search_start_node = self._graph.get_first_node()
         self._current_search_start_offset = 0
         self._current_hash = 0
-        self._current_bases = NumpyList(dtype=np.int8)
-        self._current_nodes = NumpyList(dtype=np.int32)
+        self._current_bases = NpList(dtype=np.int8)
+        self._current_nodes = NpList(dtype=np.int32)
 
         self.results = []
 
@@ -92,7 +92,7 @@ class DenseKmerFinder:
             #logging.info("Will limit kmers to whitelist (%d kmers in whitelist)" % len(whitelist))
 
     def get_flat_kmers(self, v="2"):
-        assert self._allele_frequencies.get_nparray().dtype == np.float
+        assert self._allele_frequencies.get_nparray().dtype == float
         if v == "0" or v == "1":
             #logging.info("Converting start nodes/offsets to an iD to be compatible with FlatKmers")
             # return old version, convert start nodes and offsets to a position id
@@ -190,11 +190,13 @@ class DenseKmerFinder:
 
         # add beginning of graph as starting point if necessary
         if self._start_at_critical_path_number is None or self._start_at_critical_path_number == 0:
-            if self._graph.get_node_size(self._graph.get_first_node()) < self._k:  # means beginning is not a critical point, needs to add
+            if self._graph.get_node_size(self._graph.get_first_node()) <= self._k:  # means beginning is not a critical point, needs to add
                 self._starting_points.append((self._graph.get_first_node(), 0))
+                logging.info("Added first node of graph to critical nodes")
 
 
         #for critical_node, critical_offset in [(self._graph.get_first_node(), 0)] + list(self._critical_graph_paths):
+        logging.info("Starting points: %s" % self._starting_points)
         while len(self._starting_points) > 0:
             self._recursion_depth = 0
             critical_node, critical_offset = self._starting_points.pop()
@@ -203,8 +205,8 @@ class DenseKmerFinder:
                 logging.info("Stopping at critical path number %d" % self._stop_at_critical_path_number)
                 break
 
-            self._current_bases = NumpyList(dtype=np.int8)
-            self._current_nodes = NumpyList()
+            self._current_bases = NpList(dtype=np.int8)
+            self._current_nodes = NpList()
             self._current_path_start_position = 0
             self._current_critical_node = critical_node
             self._current_critical_offset = critical_offset
@@ -235,7 +237,7 @@ class DenseKmerFinder:
 
     def search_from(self, node, offset, current_hash):
 
-        assert self._allele_frequencies._dtype == np.float, self._allele_frequencies._dtype
+        assert self._allele_frequencies._dtype == float, self._allele_frequencies._dtype
 
         self._recursion_depth += 1
         node_size = self._graph.get_node_size(node)
@@ -350,7 +352,7 @@ class DenseKmerFinder:
         self._nodes.extend(np.zeros(n) + node)
         self._start_nodes.extend(np.zeros(n) + node)
         self._start_offsets.extend(offsets_to_add)
-        self._allele_frequencies.extend(np.zeros(n, dtype=np.float) + self._graph.get_node_allele_frequency(node))
+        self._allele_frequencies.extend(np.zeros(n, dtype=float) + self._graph.get_node_allele_frequency(node))
 
         # continue search from next offset and stop this search
         # NB: Converting to python int's to avoid problems when working with these hashes further

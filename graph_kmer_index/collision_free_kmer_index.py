@@ -8,7 +8,7 @@ from graph_kmer_index import kmer_hash_to_sequence, sequence_to_kmer_hash
 from npstructures import Counter, HashTable
 from Bio.Seq import Seq
 
-from npstructures.multi_value_hashtable import MultiValueHashTable
+from .multi_value_hashtable import MultiValueHashTable
 
 class CounterKmerIndex:
     def __init__(self, kmers, nodes, counter):
@@ -23,6 +23,13 @@ class CounterKmerIndex:
         unique_kmers = np.unique(kmers)
         counter = Counter(unique_kmers, np.zeros_like(unique_kmers), mod=modulo)
         return cls(kmers, nodes, counter)
+
+    def count_kmers(self, kmers):
+        self.counter.count(kmers.astype(np.int64))
+
+    def get_node_counts(self):
+        return np.bincount(self.nodes, self.counter[self.kmers])
+
 
 
 class MinimalKmerIndex:
@@ -254,8 +261,8 @@ class CollisionFreeKmerIndex:
 
     def get(self, kmer, max_hits=10):
         hash = kmer % self._modulo
-        position = self._hashes_to_index[hash]
-        n_hits = self._n_kmers[hash]
+        position = self._hashes_to_index[int(hash)]
+        n_hits = self._n_kmers[int(hash)]
         start = position
         end = position + n_hits
         hit_positions = np.where(self._kmers[start:end] == kmer)[0]
@@ -401,7 +408,7 @@ class CollisionFreeKmerIndex:
             logging.info("Hashes: %s" % hashes)
             raise
 
-        lookup = np.zeros(modulo, dtype=np.int)
+        lookup = np.zeros(modulo, dtype=np.int32)
         lookup[unique_hashes] = unique_entry_positions
         n_entries = np.ediff1d(unique_entry_positions, to_end=len(nodes)-unique_entry_positions[-1])
         n_kmers = np.zeros(modulo, dtype=np.uint32)

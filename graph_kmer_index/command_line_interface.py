@@ -27,7 +27,7 @@ from shared_memory_wrapper import get_shared_pool, close_shared_pool
 from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
 from obgraph.haplotype_matrix import HaplotypeMatrix
 from npstructures import HashTable, Counter
-from npstructures.npset import NpSet
+from .npset import NpSet
 from .collision_free_kmer_index import CounterKmerIndex
 from .kmer_finder import DenseKmerFinder
 from .collision_free_kmer_index import KmerIndex2
@@ -444,9 +444,6 @@ def run_argument_parser(args):
     def index_single_thread(data):
         args, chunk = data
         args = object_from_shared_memory(args)
-
-        assert len(args["graph"].numeric_node_sequences) > 0
-
         logging.info("Processing chunk %s" % str(chunk))
         log_memory_usage_now(str(chunk))
 
@@ -474,8 +471,6 @@ def run_argument_parser(args):
             args.critical_paths = CriticalGraphPaths.from_graph(graph, args.k)
 
         args.position_id = PositionId.from_graph(args.graph) if args.position_id is not None else None
-
-        assert len(args.graph.numeric_node_sequences) > 0
 
         args = vars(args)
         args.pop("func")
