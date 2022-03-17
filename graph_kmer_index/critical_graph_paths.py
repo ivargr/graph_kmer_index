@@ -49,7 +49,7 @@ class CriticalGraphPaths:
 
         for start_node in graph.chromosome_start_nodes:
 
-            logging.info("On chromosome start node %d" % start_node)
+            #logging.info("On chromosome start node %d" % start_node)
             current_node = start_node
             depth = 0
             bp_since_last_join = 0
@@ -66,7 +66,7 @@ class CriticalGraphPaths:
                     #print("Resetting bp since last join, Prev depth: %d" % prev_depth)
                     bp_since_last_join = 0
 
-                print("Node %d, depth %d. Bp since last join: %d" % (current_node, depth, bp_since_last_join))
+                #print("Node %d, depth %d. Bp since last join: %d" % (current_node, depth, bp_since_last_join))
 
                 node_size = graph.get_node_size(current_node)
 
@@ -75,7 +75,7 @@ class CriticalGraphPaths:
                     if bp_since_last_join <= k and bp_since_last_join + node_size >= k:
                         # we have a critical path point somewhere on this node
                         critical_nodes.append(current_node)
-                        print("  adding node %d offset %d. Bp since last join is now %d" % (current_node, k-bp_since_last_join-1, bp_since_last_join))
+                        #print("  adding node %d offset %d. Bp since last join is now %d" % (current_node, k-bp_since_last_join-1, bp_since_last_join))
                         critical_offsets.append(k - bp_since_last_join-1)
                         #bp_since_last_join += node_size
 

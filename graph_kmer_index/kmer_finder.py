@@ -196,7 +196,7 @@ class DenseKmerFinder:
 
 
         #for critical_node, critical_offset in [(self._graph.get_first_node(), 0)] + list(self._critical_graph_paths):
-        logging.info("Starting points: %s" % self._starting_points)
+        #logging.info("Starting points: %s" % self._starting_points)
         while len(self._starting_points) > 0:
             self._recursion_depth = 0
             critical_node, critical_offset = self._starting_points.pop()
