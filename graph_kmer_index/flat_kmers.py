@@ -39,6 +39,12 @@ class FlatKmers:
         else:
             self._allele_frequencies = allele_frequencies
 
+    def describtion(self):
+        out = ""
+        for kmer, node in zip(self._hashes, self._nodes):
+            out += "%d: %d\n" % (kmer, node)
+        return out
+
 
     @classmethod
     def from_file(cls, file_name):
@@ -57,7 +63,6 @@ class FlatKmers:
 
     @classmethod
     def from_multiple_flat_kmers(cls, flat_kmers_list):
-        logging.info("Making flat kmers")
         hashes = []
         nodes = []
         ref_offsets = []
@@ -75,7 +80,6 @@ class FlatKmers:
         else:
             ref_offsets = np.array(ref_offsets, np.uint64)
 
-        logging.info("Done making flat kmers")
         return FlatKmers(np.array(hashes, dtype=np.uint64), np.array(nodes, np.uint32), ref_offsets, np.array(allele_frequencies, dtype=np.single))
 
     def sum_of_kmer_frequencies(self, kmer_index_with_frequencies):

@@ -47,6 +47,7 @@ class CriticalGraphPaths:
         critical_offsets = []
 
 
+        logging.info("Iterating chromosome start nodes %s" % graph.chromosome_start_nodes)
         for start_node in graph.chromosome_start_nodes:
 
             #logging.info("On chromosome start node %d" % start_node)
@@ -96,6 +97,7 @@ class CriticalGraphPaths:
                         raise Exception("")
                     current_node = next_nodes[0]
 
+        logging.info("Found %d critical paths" % len(critical_nodes))
         return cls(np.array(critical_nodes, dtype=np.uint32), np.array(critical_offsets, np.uint16))
 
 

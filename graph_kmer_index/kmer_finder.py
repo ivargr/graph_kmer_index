@@ -33,7 +33,8 @@ class DenseKmerFinder:
                  only_store_variant_nodes=False,
                  start_at_critical_path_number=None, stop_at_critical_path_number=None,
                  whitelist=None,
-                 only_store_nodes=None):
+                 only_store_nodes=None,
+                 only_follow_nodes=None):
 
         self._graph = graph
         self._linear_ref_nodes = self._graph.linear_ref_nodes()
@@ -83,6 +84,7 @@ class DenseKmerFinder:
 
         self._whitelist = whitelist  # set of kmers, do not store any other than these
         self._n_skipped_whitelist = 0
+        self._only_follow_nodes = only_follow_nodes
 
         self._early_stop = False
 
@@ -121,7 +123,8 @@ class DenseKmerFinder:
         #             (kmer, start_node, start_offset, nodes, start_node, start_offset))
 
         n_variant_nodes = len([n for n in nodes if not self._graph.is_linear_ref_node_or_linear_ref_dummy_node(n)])
-        assert n_variant_nodes <= self._max_variant_nodes
+        if n_variant_nodes > self._max_variant_nodes:
+            logging.warning("Passed too many variant nodes")
 
 
         kmer_allele_frequency = np.min(self._graph.get_node_allele_frequencies(nodes))
@@ -288,13 +291,15 @@ class DenseKmerFinder:
                              % (node, len(self._graph.nodes), offset, len(self._kmers),
                                 self._n_nodes_skipped_because_too_complex,
                                 len(self._current_bases), self._recursion_depth, self._nonempty_bases_traversed,
-                                ",".join((str(b) for b in np.unique(self._current_nodes[self._current_path_start_position:])))))
+                                ",".join((str(b) for b in (self._current_nodes[self._current_path_start_position:])))))
                 #logging.info("Current search start node/offset: %d/%d" % (self._current_search_start_node, self._current_search_start_offset))
 
             current_path_desc = (node, offset, frozenset(self._current_nodes[self._current_path_start_position:]))
             if (node != self._current_critical_node or offset != self._current_critical_offset) and \
-                    current_path_desc in self._positions_treated and len(self._current_nodes) >= self._k:
+                    current_path_desc in self._positions_treated and len(self._current_nodes[self._current_path_start_position:]) >= self._k:
                 self._recursion_depth -= 1
+                #logging.info("Stopping recursion")
+                #logging.info("current path desc: %s" % str((current_path_desc)))
                 return False
 
             self._positions_treated.add(current_path_desc)
@@ -363,18 +368,24 @@ class DenseKmerFinder:
 
     def _search_next_nodes(self, current_hash, node):
         next_nodes = self._graph.get_edges(node)
+        force_follow = False
+        if self._only_follow_nodes is not None and len(self._only_follow_nodes.intersection(next_nodes)) > 0:
+            next_nodes = self._only_follow_nodes.intersection(next_nodes)
+            force_follow = True
+
         if len(next_nodes) > 0:
             n_variant_nodes_passed = len(set([n for n in self._current_nodes[self._current_path_start_position:] if
                                               not self._graph.is_linear_ref_node_or_linear_ref_dummy_node(n)]))
             #logging.info("Searching next nodes from %d. Variant nodes until now: %d" % (node, n_variant_nodes_passed))
-            assert n_variant_nodes_passed <= self._max_variant_nodes
+            if n_variant_nodes_passed > self._max_variant_nodes:
+                logging.warning("Passed more variant nodes than planned. Could happen if forcing following certain nodes")
 
-            if n_variant_nodes_passed >= self._max_variant_nodes:
+            if not force_follow and n_variant_nodes_passed >= self._max_variant_nodes:
                 # only allow next nodes on linear ref
                 self._n_nodes_skipped_because_too_complex += len(next_nodes)
                 next_nodes = [node for node in next_nodes if
                               self._graph.is_linear_ref_node_or_linear_ref_dummy_node(node)]
-                assert len(next_nodes) == 1
+                assert len(next_nodes) == 1, "Not 1 linear ref next nodes from node %d: %s" % (node, next_nodes)
                 self._n_nodes_skipped_because_too_complex -= len(next_nodes)
 
             #logging.info("Next nodes: %s" % next_nodes)

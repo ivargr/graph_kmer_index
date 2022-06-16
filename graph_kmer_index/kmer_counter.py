@@ -53,5 +53,6 @@ class KmerCounter:
         return cls(counter)
 
     def get_frequency(self, kmer):
-        return self.counter[kmer]
+        #assert isinstance(kmer, int), "Kmer is %s" % type(kmer)
+        return self.counter[int(kmer)]
 

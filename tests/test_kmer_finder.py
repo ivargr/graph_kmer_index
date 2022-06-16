@@ -367,6 +367,25 @@ def test_snp_and_indel():
     assert np.all(index.get_nodes(sequence_to_kmer_hash("CTGAGGGGTCCCC")) == [6])
 
 
+
+def test_some_case():
+    graph = Graph.from_dicts(
+        {1: "AAAAAACTG", 2: "A", 3: "G", 4: "GC", 5: "T", 6: "C", 7: "TGAGCCCCC",
+         8: "A", 9: "T", 10: "AAAAA"},
+        {1: [2, 3], 2: [4], 3: [4], 4: [5, 6], 5: [7], 6: [7], 7: [8, 9], 9: [10], 8: [10]},
+        [1, 2, 4, 5, 7, 8, 10]
+    )
+
+    kmer_finder = DenseKmerFinder(graph, k=5)
+    kmer_finder.find()
+    flat = kmer_finder.get_flat_kmers()
+    index = KmerIndex2.from_flat_kmers(flat)
+
+    print(index.get_start_nodes(sequence_to_kmer_hash("CTGAG")))
+    assert set(index.get_start_nodes(sequence_to_kmer_hash("CTGAG"))) == set([4, 7])
+
+
+
 very_simple_test()
 simple_test()
 test_nested_paths()
@@ -385,3 +404,4 @@ test_find_kmers_from_position()
 test_special_case()
 test_indel()
 test_snp_and_indel()
+test_some_case()

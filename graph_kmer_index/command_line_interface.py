@@ -326,7 +326,8 @@ def run_argument_parser(args):
                                           node_to_variants=node_to_variants,
                                           do_not_choose_lowest_frequency_kmers=args["do_not_choose_lowest_frequency_kmers"],
                                           use_dense_kmer_finder=use_dense_kmer_finder,
-                                          position_id_index=args["position_id_index"]
+                                          position_id_index=args["position_id_index"],
+                                          use_simple=args["simple"]
                                           )
         flat_kmers = finder.find_unique_kmers()
         return flat_kmers
@@ -367,7 +368,32 @@ def run_argument_parser(args):
     subparser.add_argument("-c", "--chunk-size", required=False, default=10000, type=int, help="Number of variants given to each thread")
     subparser.add_argument("-m", "--max-variant-nodes", required=False, default=6, type=int, help="Maximum number of variant nodes allowed in kmer")
     subparser.add_argument("-d", "--do-not-choose-lowest-frequency-kmers", required=False, type=bool, help="For testing only. Will not choose the best kmers.")
+    subparser.add_argument("-S", "--simple", type=bool, default=False, help="Set to True to use simple kmer selection")
     subparser.set_defaults(func=make_unique_variant_kmers)
+
+
+    def sample_kmers_from_structural_variants_command(args):
+        from .structural_variants import sample_kmers_from_structural_variants
+        kmers = sample_kmers_from_structural_variants(args.graph,
+                                                      args.variant_to_nodes,
+                                                      args.kmer_index,
+                                                      args.kmer_size)
+        kmers.to_file(args.out_file_name)
+
+
+    subparser = subparsers.add_parser("sample_kmers_from_structural_variants", help="Samples extra kmers from large structural variant nodes. Meant ot be combined with other variant kmers")
+    subparser.add_argument("-g", "--graph", required=True, type=Graph.from_file)
+    subparser.add_argument("-V", "--variant_to_nodes", required=True, type=VariantToNodes.from_file)
+    subparser.add_argument("-k", "--kmer-size", required=True, type=int)
+    subparser.add_argument("-i", "--kmer-index", required=False,
+                           help="Kmer index used to check frequency of kmers in genome",
+                           type=from_file)
+    subparser.add_argument("-I", "--kmer-counter", required=False,
+                           help="Kmer index used to check frequency of kmers in genome", type=from_file)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
+    subparser.set_defaults(func=sample_kmers_from_structural_variants_command)
+
 
     subparser = subparsers.add_parser("prune_flat_kmers")
     subparser.add_argument("-f", "--flat-index", required=True)

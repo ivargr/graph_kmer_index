@@ -17,18 +17,25 @@ class CounterKmerIndex:
         self.counter = counter
 
     @classmethod
-    def from_kmer_index(cls, kmer_index, modulo):
+    def from_kmer_index(cls, kmer_index, modulo=20000033):
         kmers = kmer_index._kmers.astype(np.int64)
         nodes = kmer_index._nodes
         unique_kmers = np.unique(kmers)
-        counter = Counter(unique_kmers, np.zeros_like(unique_kmers), mod=modulo)
+        logging.info("N unique kmers: %d" % len(unique_kmers))
+        counter = Counter(unique_kmers, np.zeros_like(unique_kmers, dtype=np.uint16), mod=modulo, value_dtype=np.uint16)
         return cls(kmers, nodes, counter)
 
-    def count_kmers(self, kmers):
+    def reset(self):
+        self.counter = np.zeros_like(self.counter)
+
+    def count_kmers(self, kmers, update_counter=True):
+        if not update_counter:
+            self.reset()
+
         self.counter.count(kmers.astype(np.int64))
 
-    def get_node_counts(self):
-        return np.bincount(self.nodes, self.counter[self.kmers])
+    def get_node_counts(self, min_nodes=0):
+        return np.bincount(self.nodes, self.counter[self.kmers], minlength=min_nodes)
 
 
 
@@ -258,6 +265,11 @@ class CollisionFreeKmerIndex:
 
     def __contains__(self, item):
         return self.get(int(item), 100000000000)[0] is not None
+
+
+    def get_nodes(self, kmer, max_hits=10):
+        nodes, offsets, frequencies, allele_frequencies = self.get(kmer, max_hits)
+        return nodes
 
     def get(self, kmer, max_hits=10):
         hash = kmer % self._modulo

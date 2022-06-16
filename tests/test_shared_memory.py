@@ -1,5 +1,6 @@
 import time
 import logging
+import pytest
 
 from shared_memory_wrapper.shared_memory import run_numpy_based_function_in_parallel
 import numpy as np
@@ -25,6 +26,7 @@ def simple_test():
     linear_result = simple_numpy_function(a, b)
     assert np.all(result == linear_result)
 
+@pytest.mark.skip
 def complex_test():
     size = 10000000
     a = np.arange(size) + 1.5
@@ -40,7 +42,3 @@ def complex_test():
     logging.info("Spent %.4f sec linear" % (time.perf_counter()-start))
 
     assert np.all(result == slow_numpy_function(a, b, c, d))
-
-
-simple_test()
-complex_test()
