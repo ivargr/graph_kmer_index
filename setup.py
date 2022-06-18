@@ -3,7 +3,7 @@ from distutils.core import setup, Extension
 
 
 setup(name='graph_kmer_index',
-      version='0.0.16',
+      version='0.0.18',
       description='Graph Kmer Index',
       url='http://github.com/ivargr/graph_kmer_index',
       author='Ivar Grytten',
@@ -12,7 +12,7 @@ setup(name='graph_kmer_index',
       packages=["graph_kmer_index"],
       zip_safe=False,
       install_requires=['numpy', 'sortedcontainers', 'tqdm', 'biopython', 'cython', 'SharedArray', 'pyfaidx',
-                        'shared_memory_wrapper>=0.0.7', 'npstructures'],
+                        'shared_memory_wrapper>=0.0.7', 'npstructures', 'bionumpy'],
       classifiers=[
             'Programming Language :: Python :: 3'
       ],
