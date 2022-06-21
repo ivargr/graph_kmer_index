@@ -16,4 +16,4 @@ class IndexBundle:
         return cls(from_file(file_name))
 
     def to_file(self, file_name, compress=True):
-        return to_file(self.indexes, file_name)
+        return to_file(self.indexes, file_name, compress=compress)
