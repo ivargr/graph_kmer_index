@@ -18,21 +18,13 @@ def very_simple_test():
     flat = finder.get_flat_kmers()
     print("Kmers found: %s" % finder.kmers_found)
 
-    print(flat._hashes)
-
     index = KmerIndex2.from_flat_kmers(flat, modulo=15)
-
 
     assert np.all(index.get_nodes(sequence_to_kmer_hash("ATA")) == [0, 2, 3])
     assert np.all(index.get_start_nodes(sequence_to_kmer_hash("ATA")) == [3, 3, 3])
     assert np.all(index.get_start_offsets(sequence_to_kmer_hash("ATA")) == [0, 0, 0])
-
     assert set(index.get_nodes(sequence_to_kmer_hash("ACA"))) == set([0, 1, 3])
-
-    print(index.get_nodes(sequence_to_kmer_hash("AAA")))
-
     assert set(index.get_nodes(sequence_to_kmer_hash("AAA"))) == set([0, 3])
-
     assert len(index.get_all_kmers()) == 16
 
 

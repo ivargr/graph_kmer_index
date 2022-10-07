@@ -17,12 +17,13 @@ class CounterKmerIndex:
         self.counter = counter
 
     @classmethod
-    def from_kmer_index(cls, kmer_index, modulo=20000033):
+    def from_kmer_index(cls, kmer_index):
         kmers = kmer_index._kmers.astype(np.int64)
         nodes = kmer_index._nodes
         unique_kmers = np.unique(kmers)
         logging.info("N unique kmers: %d" % len(unique_kmers))
-        counter = Counter(unique_kmers, np.zeros_like(unique_kmers, dtype=np.uint16), mod=modulo, value_dtype=np.uint16)
+        #counter = Counter(unique_kmers, np.zeros_like(unique_kmers, dtype=np.uint16), mod=modulo, value_dtype=np.uint16)
+        counter = Counter(unique_kmers, 0, mod=kmer_index._modulo, value_dtype=np.uint16)
         return cls(kmers, nodes, counter)
 
     def reset(self):

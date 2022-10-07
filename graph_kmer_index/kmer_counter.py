@@ -4,7 +4,6 @@ import time
 
 from npstructures import Counter, HashTable
 import numpy as np
-import pandas as pd
 
 
 class KmerCounter:
