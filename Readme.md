@@ -69,8 +69,9 @@ This should give:
 [ 97  97  97 389 389 389 109 109 109 437 437 437]
 [1 2 4 1 2 4 1 3 4 1 3 4]
 ```
+... which means that kmer with hash 97 goes over node 1, 2 and 4, kmer with hash 389 goes over node 1, 2, 4, and so on... 
 
-... or in a more readable format:
+In a more readable format:
 ```python
 from graph_kmer_index import kmer_hash_to_sequence
 for kmer, node in zip(kmers, nodes):
