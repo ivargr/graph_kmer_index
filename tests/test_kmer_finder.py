@@ -378,6 +378,7 @@ def test_some_case():
 
 
 
+"""
 very_simple_test()
 simple_test()
 test_nested_paths()
@@ -397,3 +398,4 @@ test_special_case()
 test_indel()
 test_snp_and_indel()
 test_some_case()
+"""

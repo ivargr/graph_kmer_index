@@ -93,6 +93,9 @@ class DenseKmerFinder:
             self._whitelist = whitelist
             #logging.info("Will limit kmers to whitelist (%d kmers in whitelist)" % len(whitelist))
 
+    def get_found_kmers_and_nodes(self):
+        return (self._kmers.get_nparray(), self._nodes.get_nparray())
+
     def get_flat_kmers(self, v="2"):
         assert self._allele_frequencies.get_nparray().dtype == float
         if v == "0" or v == "1":
