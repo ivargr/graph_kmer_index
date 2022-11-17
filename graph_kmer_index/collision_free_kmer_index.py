@@ -7,6 +7,7 @@ import gc
 from graph_kmer_index import kmer_hash_to_sequence, sequence_to_kmer_hash
 from npstructures import Counter, HashTable
 from Bio.Seq import Seq
+from .flat_kmers import FlatKmers
 
 from .multi_value_hashtable import MultiValueHashTable
 
@@ -438,6 +439,26 @@ class CollisionFreeKmerIndex:
         return object
 
 
+    def convert_kmers_to_complement(self, k=31, skip_frequencies=True):
+        from .kmer_hashing import kmer_hashes_to_complement_hashes
+        new_kmers = []
+        for i, kmer_chunk in enumerate(np.array_split(self._kmers, len(self._kmers)//10000000)):
+            logging.info("Doing chunk %d" % i)
+            new_kmers.append(kmer_hashes_to_complement_hashes(kmer_chunk, k))
 
+        logging.info("Concatenating")
+        new_kmers = np.concatenate(new_kmers)
+
+        logging.info("Building")
+        return CollisionFreeKmerIndex.from_flat_kmers(
+            FlatKmers(
+                new_kmers,
+                self._nodes,
+                self._ref_offsets,
+                self._allele_frequencies,
+            ),
+            modulo=self._modulo,
+            skip_frequencies=skip_frequencies
+        )
 
 

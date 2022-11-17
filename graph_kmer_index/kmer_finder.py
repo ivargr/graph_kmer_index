@@ -6,6 +6,7 @@ from .nplist import NpList
 import sys
 sys.setrecursionlimit(20000)
 from obgraph.position_id import PositionId
+from . import kmer_hash_to_sequence
 
 def update_hash(current_base, current_hash, first_base, k, only_add=False):
     # only_add=True means to build hash without subtracting previous first base
@@ -122,8 +123,8 @@ class DenseKmerFinder:
             return
 
         nodes = np.unique(self._current_nodes[self._current_path_start_position:])
-        #logging.info("     Adding kmer %d at node/offset %d/%d with nodes %s. Start node/offset: %d/%d" %
-        #             (kmer, start_node, start_offset, nodes, start_node, start_offset))
+        logging.info("     Adding kmer %s at node/offset %d/%d with nodes %s. Start node/offset: %d/%d" %
+                     (kmer_hash_to_sequence(kmer, self._k), start_node, start_offset, nodes, start_node, start_offset))
 
         n_variant_nodes = len([n for n in nodes if not self._graph.is_linear_ref_node_or_linear_ref_dummy_node(n)])
         if n_variant_nodes > self._max_variant_nodes:
@@ -288,7 +289,7 @@ class DenseKmerFinder:
 
             assert self._nonempty_bases_traversed <= len(self._current_bases)
 
-            if False and ((node < 100 and offset < 15) or (offset > 0 and offset % 5000 == 0) or node % 5000 == 0):
+            if True and ((node < 100 and offset < 15) or (offset > 0 and offset % 5000 == 0) or node % 5000 == 0):
                 logging.info("On node %d/%d, offset %d, %d kmers added. Skipped nodes: %d. "
                              "Path length: %d. Rec depth: %d. Nonempty traversed: %d. Nodes: %s"
                              % (node, len(self._graph.nodes), offset, len(self._kmers),

@@ -4,6 +4,7 @@ from graph_kmer_index import KmerIndex2, sequence_to_kmer_hash
 from obgraph import Graph
 logging.basicConfig(level=logging.INFO)
 import numpy as np
+from graph_kmer_index import kmer_hash_to_sequence
 
 
 def very_simple_test():
@@ -377,6 +378,84 @@ def test_some_case():
     assert set(index.get_start_nodes(sequence_to_kmer_hash("CTGAG"))) == set([4, 7])
 
 
+def test_case2():
+    graph = Graph.from_dicts(
+        {0: "AGTAGA", 1: "G", 2: "CT", 3: "A", 4: "CTA", 5: "G", 6: "A", 7: "TCATA"},
+        {0: [1, 2], 1: [3], 2: [3], 3: [4], 4: [5, 6], 5: [7], 6: [7], 7: []},
+        [0, 1, 3, 4, 5, 7]
+    )
+
+    kmer_finder = DenseKmerFinder(graph, k=3)
+    kmer_finder.find()
+    kmers, nodes = kmer_finder.get_found_kmers_and_nodes()
+
+
+def test_case1():
+    """
+    graph = Graph.from_dicts(
+        {0: "AGTAGA", 1: "G", 2: "CT", 3: "A", 4: "CTA", 5: "G", 6: "A", 7: "TCATA"},
+        {0: [1, 2], 1: [3], 2: [3], 3: [4], 4: [5, 6], 5: [7], 6: [7], 7: []},
+        [0, 1, 3, 4, 5, 7]
+    )
+    """
+
+    graph = Graph.from_dicts(
+        {0: "AGTAGA", 1: "G", 2: "CT", 3: "ACTA", 5: "G", 6: "A", 7: "TCATA"},
+        {0: [1, 2], 1: [3], 2: [3], 3: [5, 6], 5: [7], 6: [7], 7: []},
+        [0, 1, 3, 5, 7]
+    )
+
+    kmer_finder = DenseKmerFinder(graph, k=3)
+    kmer_finder.find()
+    kmers, nodes = kmer_finder.get_found_kmers_and_nodes()
+
+    correct = [
+        ["AGT", 0],
+        ["GTA", 0],
+        ["TAG", 0],
+        ["AGA", 0],
+        ["GAG", 0],
+        ["GAG", 1],
+        ["AGA", 0],
+        ["AGA", 1],
+        ["AGA", 3],
+        ["GAC", 1],
+        ["GAC", 3],
+        ["GAC", 0],
+        ["GAC", 2],
+        ["ACT", 0],
+        ["ACT", 2],
+        ["CTA", 2],
+        ["CTA", 3],
+        ["TAC", 2],
+        ["TAC", 3],
+        ["ACT", 3],
+        ["CTA", 3],
+        ["TAG", 3],
+        ["TAG", 5],
+        ["AGT", 3],
+        ["AGT", 5],
+        ["AGT", 7],
+        ["GTC", 5],
+        ["GTC", 7],
+        ["TAA", 3],
+        ["TAA", 6],
+        ["AAT", 3],
+        ["AAT", 6],
+        ["AAT", 7],
+        ["ATC", 6],
+        ["ATC", 7],
+        ["TCA", 7],
+        ["CAT", 7],
+        ["ATA", 7]
+    ]
+
+    for i, (kmer, node) in enumerate(zip(kmers, nodes)):
+        print(kmer_hash_to_sequence(kmer, 3).upper(), node, *correct[i])
+        assert kmer_hash_to_sequence(kmer, 3).upper() == correct[i][0]
+        assert node == correct[i][1]
+
+    print(len(correct))
 
 """
 very_simple_test()
@@ -399,3 +478,4 @@ test_indel()
 test_snp_and_indel()
 test_some_case()
 """
+test_case2()
