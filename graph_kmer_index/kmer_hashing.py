@@ -47,7 +47,6 @@ def kmer_hashes_to_bases(hashes, k):
     bases = np.zeros((len(hashes), k), dtype=np.uint64)
     #for i in range(k-1, -1, -1):
     for i in range(k):
-        logging.debug("Finding hashes. k=%d/%d" % (i, k))
         # print("Hash now: %d" % hash)
         exponential = np.power(np.uint64(4), np.uint64(k - i - 1), dtype=np.uint64)
         # base = hash // exponential   # gives float, no good
