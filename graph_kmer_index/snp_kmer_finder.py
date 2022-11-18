@@ -24,9 +24,9 @@ def kmer_hash_to_sequence(hash, k):
         elif base == 1:
             letter_base = "c"
         elif base == 2:
-            letter_base = "t"
-        elif base == 3:
             letter_base = "g"
+        elif base == 3:
+            letter_base = "t"
         else:
             raise Exception("ERROR")
         #print("i: %d, base: %d, exp: %d letter: %s, ny hash: %d" % (i, base, exponential, letter_base, hash))
@@ -49,15 +49,7 @@ def kmer_to_hash_fast(kmer, k):
 
 #@jit(nopython=True)
 def kmer_to_hash_fast(kmer, k):
-    if k <= 31:
-        number = int(np.sum(kmer * np.power(4, np.arange(0, k)[::-1])))
-    else:
-        assert k == 40
-        number1 = kmer_to_hash_fast(kmer[0:31], 31) % 4611686018427125681  # 4**31 - 4**9 - 11
-        number2 = kmer_to_hash_fast(kmer[31:], k-31)
-        number = number1 + number2
-
-    return number
+    return int(np.sum(kmer * np.power(4, np.arange(0, k)[::-1])))
 
 
 class SnpKmerFinder:
@@ -333,7 +325,7 @@ class SnpKmerFinder:
         #assert self.spacing == 1, "Finding kmers on linear reference is only possible when spacing is 1"
         #loggign.info("Fetching reference sequence between %d and %d" % (self._start_position, self._end_position+self.k))
         reference_sequence = str(self.reference[self._start_position:self._end_position+self.k])
-        assert len(reference_sequence) > 0
+        assert len(reference_sequence) > 0, "No reference sequence between positions %d and %d" % (self._start_position, self._end_position+self.k)
         #loggign.info("Fetching kmers")
         from .read_kmers import ReadKmers
         kmers = ReadKmers.get_kmers_from_read_dynamic(reference_sequence, np.power(4, np.arange(0, self.k)))

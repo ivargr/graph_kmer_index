@@ -62,6 +62,7 @@ def create_index_single_thread(args, interval=None):
             fasta = Fasta(args.reference_fasta)
             logging.info("Names in fasta: %s" % str(fasta.keys()))
             reference = fasta[args.reference_name]
+            assert len(reference) > 0, "Length of ref sequennce is 0. Seomthing is wrong"
         except KeyError:
             logging.error("Did not find reference name %s in %s" % (args.reference_name, args.reference_fasta))
             raise

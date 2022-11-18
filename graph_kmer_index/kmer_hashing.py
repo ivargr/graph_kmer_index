@@ -24,8 +24,14 @@ def kmer_hashes_to_complement_hashes(hashes, k):
 
 
 def kmer_hashes_to_complement_bases(hashes, k):
+    #raise NotImplementedError("Must be fixed to work with ACGT encoding")
     bases = kmer_hashes_to_bases(hashes, k)
-    complement_bases = (bases + 2) % 4
+    complement_bases = np.zeros_like(bases)
+    complement_bases[bases == 0] = 3
+    complement_bases[bases == 3] = 0
+    complement_bases[bases == 2] = 1
+    complement_bases[bases == 1] = 2
+    #complement_bases = (bases + 2) % 4
     return complement_bases
 
 

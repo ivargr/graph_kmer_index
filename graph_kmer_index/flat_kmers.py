@@ -132,8 +132,8 @@ def letter_sequence_to_numeric(sequence):
     numeric[np.where(sequence == "n")[0]] = 0
     numeric[np.where(sequence == "a")[0]] = 0
     numeric[np.where(sequence == "c")[0]] = 1
-    numeric[np.where(sequence == "t")[0]] = 2
-    numeric[np.where(sequence == "g")[0]] = 3
+    numeric[np.where(sequence == "t")[0]] = 3
+    numeric[np.where(sequence == "g")[0]] = 2
     numeric[np.where(sequence == "m")[0]] = 0
     return numeric
 
@@ -142,8 +142,8 @@ def numeric_to_letter_sequence(sequence):
     numeric = np.zeros_like(sequence, dtype=object)
     numeric[np.where(sequence == 0)[0]] = "a"
     numeric[np.where(sequence == 1)[0]] = "c"
-    numeric[np.where(sequence == 2)[0]] = "t"
-    numeric[np.where(sequence == 3)[0]] = "g"
+    numeric[np.where(sequence == 2)[0]] = "g"
+    numeric[np.where(sequence == 3)[0]] = "t"
     return numeric
 
 
