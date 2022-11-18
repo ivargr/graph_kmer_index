@@ -1,55 +1,29 @@
 import logging
 import time
-
+from .kmer_hashing import power_array
 
 logging.basicConfig(level=logging.INFO)
 import numpy as np
 from .flat_kmers import FlatKmers, letter_sequence_to_numeric
 from Bio.Seq import Seq
 from collections import defaultdict
+from .kmer_hashing import reverse_power_array, power_array, kmer_hashes_to_bases
+from .flat_kmers import numeric_to_letter_sequence
 
 
 def kmer_hash_to_sequence(hash, k):
-    hash = np.uint64(hash)
-    bases = []
-    for i in range(k):
-        #print("Hash now: %d" % hash)
-        exponential = np.power(np.uint64(4), np.uint64(k-i-1), dtype=np.uint64)
-        #base = hash // exponential   # gives float, no good
-        base = np.floor_divide(hash, exponential, dtype=np.uint64)
-        hash -= base * exponential
-
-        if base == 0:
-            letter_base = "a"
-        elif base == 1:
-            letter_base = "c"
-        elif base == 2:
-            letter_base = "g"
-        elif base == 3:
-            letter_base = "t"
-        else:
-            raise Exception("ERROR")
-        #print("i: %d, base: %d, exp: %d letter: %s, ny hash: %d" % (i, base, exponential, letter_base, hash))
-
-        bases.append(letter_base)
-
-    return ''.join(bases)
+    bases = kmer_hashes_to_bases(np.array([hash]), k)[0]
+    return ''.join([b for b in numeric_to_letter_sequence(bases)])
 
 
 def sequence_to_kmer_hash(sequence):
-    return kmer_to_hash_fast(letter_sequence_to_numeric(sequence), len(sequence))
-
-"""
-@jit(nopython=True)
-def kmer_to_hash_fast(kmer, k):
-    numbers = int(np.sum(kmer * np.power(4, np.arange(0, k)[::-1])))
-    return numbers
-"""
+    return kmer_to_hash_fast(letter_sequence_to_numeric(sequence).astype(np.uint64), len(sequence))
 
 
 #@jit(nopython=True)
 def kmer_to_hash_fast(kmer, k):
-    return int(np.sum(kmer * np.power(4, np.arange(0, k)[::-1])))
+    assert kmer.dtype == np.uint64
+    return int(np.sum(kmer * reverse_power_array(k)))
 
 
 class SnpKmerFinder:
@@ -328,7 +302,7 @@ class SnpKmerFinder:
         assert len(reference_sequence) > 0, "No reference sequence between positions %d and %d" % (self._start_position, self._end_position+self.k)
         #loggign.info("Fetching kmers")
         from .read_kmers import ReadKmers
-        kmers = ReadKmers.get_kmers_from_read_dynamic(reference_sequence, np.power(4, np.arange(0, self.k)))
+        kmers = ReadKmers.get_kmers_from_read_dynamic(reference_sequence, power_array(self.k))
         kmers = kmers[::self.spacing]
         #loggign.info("Done fetching kmers")
 

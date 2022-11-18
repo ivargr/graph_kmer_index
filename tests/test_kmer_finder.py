@@ -149,7 +149,7 @@ def test_graph_with_multiple_critical_points():
     assert set(index.get_nodes(sequence_to_kmer_hash("CAC"))) == set([1, 3, 4])
 
 
-def test_two_long_nodes():
+def test_two_long_nodes1():
     graph = Graph.from_dicts(
         {1: "CCCCCCCCCC", 2: "AAAA"},
         {1: [2]},
@@ -158,6 +158,7 @@ def test_two_long_nodes():
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
+    print(flat)
     index = KmerIndex2.from_flat_kmers(flat)
 
     start_pos = set(index.get_start_offsets(sequence_to_kmer_hash("CCC")))
@@ -256,6 +257,7 @@ def test_snp_and_long_node():
     finder = DenseKmerFinder(graph, k=3)
     finder.find()
     flat = finder.get_flat_kmers()
+    print(flat)
     index = KmerIndex2.from_flat_kmers(flat)
 
     assert set(index.get_start_offsets(sequence_to_kmer_hash("CTG"))) == set([0])
@@ -478,4 +480,4 @@ test_indel()
 test_snp_and_indel()
 test_some_case()
 """
-test_case2()
+#test_case2()

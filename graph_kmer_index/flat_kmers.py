@@ -22,6 +22,12 @@ class FlatKmers2:
             self._allele_frequencies = allele_frequencies
 
 
+    def __str__(self):
+        return '\n'.join([str(data) for data in [self._hashes, self._nodes]])
+
+    def __repr__(self):
+        return str(self)
+
 
 class FlatKmers:
     def __init__(self, hashes, nodes, ref_offsets=None, allele_frequencies=None):
@@ -128,7 +134,7 @@ def letter_sequence_to_numeric(sequence):
     if not isinstance(sequence, np.ndarray):
         sequence = np.array(list(sequence.lower()), dtype="<U1")
 
-    numeric = np.zeros_like(sequence, dtype=np.int64)
+    numeric = np.zeros_like(sequence, dtype=np.uint64)
     numeric[np.where(sequence == "n")[0]] = 0
     numeric[np.where(sequence == "a")[0]] = 0
     numeric[np.where(sequence == "c")[0]] = 1

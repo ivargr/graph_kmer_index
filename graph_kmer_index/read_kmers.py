@@ -3,6 +3,8 @@ import logging
 import numpy as np
 from graph_kmer_index import kmer_to_hash_fast, letter_sequence_to_numeric
 from Bio.Seq import Seq
+from .kmer_hashing import power_array
+
 
 class ReadKmers:
     def __init__(self, kmers):
@@ -11,7 +13,7 @@ class ReadKmers:
 
     @classmethod
     def from_fasta_file(cls, fasta_file_name, k, small_k=None, smallest_k=8):
-        power_vector = np.power(4, np.arange(0, k))
+        power_vector = power_array(k)
         f = open(fasta_file_name)
         f = [l for l in f.readlines() if not l.startswith(">")]
         logging.info("Number of lines: %d" % len(f))
@@ -23,8 +25,8 @@ class ReadKmers:
                         for line in f if not line.startswith(">"))
             )
         else:
-            power_vector_small = np.power(4, np.arange(0, small_k))
-            power_vector_smallest = np.power(4, np.arange(0, smallest_k))
+            power_vector_small = power_array(small_k)
+            power_vector_smallest = power_array(smallest_k)
             kmers = zip(
                     (itertools.chain(
 
@@ -64,15 +66,12 @@ class ReadKmers:
 
     @staticmethod
     def get_kmers_from_read_dynamic(read, power_vector):
-        #a = np.power(4, np.arange(0, k))
-        #print(a)
         read = letter_sequence_to_numeric(read)
-        #print(read)
-        #print(np.convolve(read, a, mode='valid'))
         return np.convolve(read, power_vector, mode='valid')
 
     @staticmethod
     def get_kmers_from_read_dynamic_slow(read, k):
+        raise NotImplementedError()
         read = letter_sequence_to_numeric(read)
         kmers = np.zeros(len(read)-k+1, dtype=np.int64)
         current_hash = kmer_to_hash_fast(read[0:k], k)

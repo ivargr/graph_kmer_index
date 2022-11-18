@@ -44,7 +44,7 @@ def test_sample_kmers_from_structural_variants():
     index = KmerIndex.from_flat_kmers(kmers)
 
     assert np.all(index.get_nodes(sequence_to_kmer_hash("AAAAA")) == [1])
-    logging.info(index.get_nodes(sequence_to_kmer_hash("GGGGA")))
+    print("NODES", index.get_nodes(sequence_to_kmer_hash("GGGGA")))
     assert np.all(index.get_nodes(sequence_to_kmer_hash("GGGGA")) == [3])
     assert np.all(index.get_nodes(sequence_to_kmer_hash("AAACC")) == [3])
 

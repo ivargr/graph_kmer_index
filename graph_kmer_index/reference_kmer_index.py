@@ -2,6 +2,7 @@ import logging
 import numpy as np
 from pyfaidx import Fasta
 from .read_kmers import ReadKmers
+from .kmer_hashing import power_array
 
 """
 @numba.jit
@@ -48,7 +49,7 @@ class ReferenceKmerIndex:
 
     @classmethod
     def from_sequence(cls, genome_sequence, k, only_store_kmers=False):
-        kmers = ReadKmers.get_kmers_from_read_dynamic(genome_sequence, np.power(4, np.arange(0, k)))
+        kmers = ReadKmers.get_kmers_from_read_dynamic(genome_sequence, power_array(k))
 
         ref_position_to_index = None
         if not only_store_kmers:

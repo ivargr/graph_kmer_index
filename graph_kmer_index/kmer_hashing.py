@@ -1,6 +1,13 @@
 import logging
 import numpy as np
 
+def power_array(k):
+    return np.power(4, np.arange(k-1, -1, -1)).astype(np.uint64)
+
+
+def reverse_power_array(k):
+    return np.power(4, np.arange(k)).astype(np.uint64)
+
 
 def kmer_hash_to_reverse_complement_hash(hash, k):
     return kmer_hashes_to_reverse_complement_hash(np.array([hash]), k)[0]
@@ -8,15 +15,14 @@ def kmer_hash_to_reverse_complement_hash(hash, k):
 
 def kmer_hashes_to_reverse_complement_hash(hashes, k):
     assert k <= 31
-    reverse_power_array = np.power(4, np.arange(0, k, dtype=np.uint64), dtype=np.uint64)
     complement_bases = kmer_hashes_to_complement_bases(hashes, k)
-    reverse_complement_hash = np.sum(complement_bases * reverse_power_array, axis=1)
+    reverse_complement_hash = np.sum(complement_bases * power_array(k), axis=1)
     return reverse_complement_hash
 
 
 def kmer_hashes_to_complement_hashes(hashes, k):
     assert k <= 31
-    power_array = np.power(4, np.arange(0, k, dtype=np.uint64), dtype=np.uint64)[::-1]
+    power_array = reverse_power_array(k)
     complement_bases = kmer_hashes_to_complement_bases(hashes, k)
     complement_hash = np.sum(complement_bases * power_array, axis=1)
     return complement_hash
@@ -39,6 +45,7 @@ def kmer_hashes_to_complement_bases(hashes, k):
 def kmer_hashes_to_bases(hashes, k):
     hashes = hashes.astype(np.uint64)
     bases = np.zeros((len(hashes), k), dtype=np.uint64)
+    #for i in range(k-1, -1, -1):
     for i in range(k):
         logging.debug("Finding hashes. k=%d/%d" % (i, k))
         # print("Hash now: %d" % hash)
@@ -48,4 +55,5 @@ def kmer_hashes_to_bases(hashes, k):
         hashes -= base * exponential
 
         bases[:, i] = base
-    return bases
+    return bases[:,::-1]  # reverse after hashing right-to-left
+

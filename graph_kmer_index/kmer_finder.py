@@ -7,20 +7,29 @@ import sys
 sys.setrecursionlimit(20000)
 from obgraph.position_id import PositionId
 from . import kmer_hash_to_sequence
+from .kmer_hashing import power_array, reverse_power_array
+
+_complement_lookup = np.array([3, 2, 1, 0], dtype=np.uint64)
+
 
 def update_hash(current_base, current_hash, first_base, k, only_add=False):
-    # only_add=True means to build hash without subtracting previous first base
+    # only_add!=True means to build hash without subtracting previous first base
+    # only_add should then be the number of the base we are at
     # very important that everything is int (not float) when working with large k
     current_hash = int(current_hash)
     #assert type(current_hash) == int, "Current hash has type %s" % type(current_hash)
     current_base = int(current_base)
     first_base = int(first_base)
-    current_base_complement = (current_base + 2) % 4
-    if only_add:
-        current_hash = current_hash * 4 + current_base
+    current_base_complement = _complement_lookup[current_base]  # (current_base + 2) % 4
+    #print("Current base: %d. Only add: %s" % (current_base, only_add))
+    if not isinstance(only_add, bool):
+        #current_hash = current_hash * 4 + current_base
+        current_hash = current_hash + 4**(only_add) * current_base
+        #print("ONLY ADDING HASH. Current hash: %d, only add: %d" % (current_hash, only_add))
     else:
-        current_hash = (current_hash - first_base * 4 ** (k - 1)) * 4 + current_base
-        first_base_complement = (first_base + 2) % 4
+        #current_hash = (current_hash - first_base * 4 ** (k - 1)) * 4 + current_base
+        current_hash = (current_hash - first_base) // 4 + current_base * 4**(k-1)
+        first_base_complement = _complement_lookup[first_base]  # (first_base + 2) % 4
 
     return current_hash
 
@@ -48,7 +57,7 @@ class DenseKmerFinder:
         self._kmers = NpList(dtype=np.int64)
         self._allele_frequencies = NpList(dtype=float)
         
-        self._power_vector = np.power(4, np.arange(0, k, dtype=np.uint64))
+        self._power_vector = power_array(k)
 
         self._current_search_start_node = self._graph.get_first_node()
         self._current_search_start_offset = 0
@@ -269,7 +278,7 @@ class DenseKmerFinder:
             assert first_base != -1
             current_base = self._graph.get_numeric_base_sequence(node, offset)
 
-            only_add = True
+            only_add = len(self._current_bases)
             if current_base != -1:
                 if len(self._current_bases) >= self._k:
                     self._current_path_start_position += 1
