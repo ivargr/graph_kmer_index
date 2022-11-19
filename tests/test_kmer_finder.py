@@ -1,8 +1,8 @@
 import logging
+logging.basicConfig(level=logging.INFO)
 from graph_kmer_index.kmer_finder import DenseKmerFinder
 from graph_kmer_index import KmerIndex2, sequence_to_kmer_hash
 from obgraph import Graph
-logging.basicConfig(level=logging.INFO)
 import numpy as np
 from graph_kmer_index import kmer_hash_to_sequence
 
@@ -110,6 +110,23 @@ def test_empty_dummy_nodes2():
     assert set(index.get_nodes(sequence_to_kmer_hash("AAC"))) == set([1, 2, 3])
     assert len(index.get_nodes(sequence_to_kmer_hash("AAA"))) == 3
     assert len(index.get_nodes(sequence_to_kmer_hash("CCC"))) == 4
+
+
+
+def test_empty_dummy_nodes4():
+    graph = Graph.from_dicts(
+        {1: "CC", 2: "", 3: "CCTCTG"},
+        {1: [2], 2: [3]},
+        [1, 3]
+    )
+    finder = DenseKmerFinder(graph, k=4)
+    #finder.find()
+    finder.find_only_kmers_starting_at_position(1, 0)
+    flat = finder.get_flat_kmers()
+    print(flat)
+    index = KmerIndex2.from_flat_kmers(flat)
+
+    assert set(index.get_nodes(sequence_to_kmer_hash("CCCC"))) == set([1, 2, 3])
 
 
 def test_empty_dummy_nodes3():

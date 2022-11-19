@@ -132,8 +132,8 @@ class DenseKmerFinder:
             return
 
         nodes = np.unique(self._current_nodes[self._current_path_start_position:])
-        #logging.info("     Adding kmer %s at node/offset %d/%d with nodes %s. Start node/offset: %d/%d" %
-        #             (kmer_hash_to_sequence(kmer, self._k), start_node, start_offset, nodes, start_node, start_offset))
+        #print("     Adding kmer %d/%s at node/offset %d/%d with nodes %s. Start node/offset: %d/%d" %
+        #             (kmer, kmer_hash_to_sequence(kmer, self._k), start_node, start_offset, nodes, start_node, start_offset))
 
         n_variant_nodes = len([n for n in nodes if not self._graph.is_linear_ref_node_or_linear_ref_dummy_node(n)])
         if n_variant_nodes > self._max_variant_nodes:
@@ -278,9 +278,10 @@ class DenseKmerFinder:
             assert first_base != -1
             current_base = self._graph.get_numeric_base_sequence(node, offset)
 
-            only_add = len(self._current_bases)
+            only_add = self._nonempty_bases_traversed  # len(self._current_bases)
             if current_base != -1:
-                if len(self._current_bases) >= self._k:
+                #if len(self._current_bases) >= self._k:
+                if self._nonempty_bases_traversed >= self._k:
                     self._current_path_start_position += 1
                     only_add = False
                 current_hash = update_hash(current_base, current_hash, first_base, self._k,
@@ -299,7 +300,7 @@ class DenseKmerFinder:
             assert self._nonempty_bases_traversed <= len(self._current_bases)
 
             if False and ((node < 100 and offset < 15) or (offset > 0 and offset % 5000 == 0) or node % 5000 == 0):
-                logging.info("On node %d/%d, offset %d, %d kmers added. Skipped nodes: %d. "
+                print("On node %d/%d, offset %d, %d kmers added. Skipped nodes: %d. "
                              "Path length: %d. Rec depth: %d. Nonempty traversed: %d. Nodes: %s"
                              % (node, len(self._graph.nodes), offset, len(self._kmers),
                                 self._n_nodes_skipped_because_too_complex,
