@@ -222,6 +222,9 @@ class CollisionFreeKmerIndex:
     def remove_ref_offsets(self):
         self._ref_offsets = np.array([0])
 
+    def remove_frequencies(self):
+        self._frequencies = np.array([0])
+
     def set_frequencies_using_other_index(self, other, multiplier=1, min_frequency=1):
         unique = np.unique(self._kmers)
         for i, kmer in enumerate(unique):

@@ -22,7 +22,7 @@ from .reference_kmer_index import ReferenceKmerIndex
 from pathos.multiprocessing import Pool
 from obgraph.variants import VcfVariants
 from .unique_variant_kmers import UniqueVariantKmersFinder
-from shared_memory_wrapper.shared_memory import to_shared_memory, from_shared_memory, remove_shared_memory_in_session, to_file, from_file, object_to_shared_memory, object_from_shared_memory
+from shared_memory_wrapper import to_shared_memory, from_shared_memory, remove_shared_memory_in_session, to_file, from_file, object_to_shared_memory, object_from_shared_memory
 from shared_memory_wrapper import get_shared_pool, close_shared_pool
 from obgraph.variant_to_nodes import VariantToNodes, NodeToVariants
 from obgraph.haplotype_matrix import HaplotypeMatrix
@@ -51,7 +51,7 @@ def create_index_single_thread(args, interval=None):
     logging.info("Loading data")
     #graph = Graph.from_file(args.graph_file_name)
     if args.graph_file_name is not None:
-        graph = from_shared_memory(Graph, "graph_shared"+args.shared_memory_unique_id)
+        graph = object_from_shared_memory("graph_shared"+args.shared_memory_unique_id)
         reference = None
     else:
         graph = None
@@ -107,8 +107,11 @@ def create_index(args):
     r = args.shared_memory_unique_id
 
     if args.graph_file_name is not None:
+        logging.info("Reading obgraph")
         graph = Graph.from_file(args.graph_file_name)
-        to_shared_memory(graph, "graph_shared"+r)
+        logging.info("Putting obgraph in shared memory")
+        object_to_shared_memory(graph, "graph_shared"+r)
+        logging.info("Done putting in shared memory")
 
     if args.threads == 1:
         kmers = create_index_single_thread(args)
@@ -339,7 +342,7 @@ def run_argument_parser(args):
         args.pop("func")  # necessary for putting args in shared memory
 
         logging.info("Reading all variants")
-        variants = VcfVariants.from_vcf(args["vcf"], skip_index=True, make_generator=True)
+        variants = VcfVariants.from_vcf(args["vcf"], skip_index=True, make_generator=True, dont_encode_chromosomes=True)
         variants = variants.get_chunks(chunk_size=args["chunk_size"])
         pool = Pool(args["n_threads"])
 
@@ -491,7 +494,7 @@ def run_argument_parser(args):
 
         if args.critical_graph_paths is None:
             logging.info("Making critical graph paths since not specified")
-            args.critical_paths = CriticalGraphPaths.from_graph(graph, args.k)
+            args.critical_paths = CriticalGraphPaths.from_graph(args.graph, args.kmer_size)
 
         args.position_id = PositionId.from_graph(args.graph) if args.position_id is not None else None
 

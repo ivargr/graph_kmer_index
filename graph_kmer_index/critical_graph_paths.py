@@ -94,6 +94,7 @@ class CriticalGraphPaths:
                     if len(next_nodes) != 1:
                         logging.error("Did not find 1 next node from node %d" % current_node)
                         logging.error("Edges: %s" % graph.get_edges(current_node))
+                        logging.error("Next nodes: %s" % next_nodes)
                         raise Exception("")
                     current_node = next_nodes[0]
 

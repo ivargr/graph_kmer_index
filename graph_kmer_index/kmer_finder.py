@@ -299,7 +299,7 @@ class DenseKmerFinder:
 
             assert self._nonempty_bases_traversed <= len(self._current_bases)
 
-            if False and ((node < 100 and offset < 15) or (offset > 0 and offset % 5000 == 0) or node % 5000 == 0):
+            if True and ((node < 1 and offset < 15) or (offset > 0 and offset % 5000 == 0) or node % 5000 == 0):
                 print("On node %d/%d, offset %d, %d kmers added. Skipped nodes: %d. "
                              "Path length: %d. Rec depth: %d. Nonempty traversed: %d. Nodes: %s"
                              % (node, len(self._graph.nodes), offset, len(self._kmers),
