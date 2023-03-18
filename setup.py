@@ -3,7 +3,7 @@ from distutils.core import setup, Extension
 
 
 setup(name='graph_kmer_index',
-      version='0.0.22',
+      version='0.0.23',
       description='Graph Kmer Index',
       url='http://github.com/ivargr/graph_kmer_index',
       author='Ivar Grytten',

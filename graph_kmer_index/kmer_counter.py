@@ -6,6 +6,16 @@ from npstructures import Counter, HashTable
 import numpy as np
 
 
+def choose_modulo(n_elements):
+    if n_elements < 1000000:
+        return 2000003
+    elif n_elements < 10000000:
+        return 19999999
+    else:
+        return 200000003
+
+
+
 class KmerCounter:
     def __init__(self, counter):
         self.counter = counter
@@ -21,6 +31,11 @@ class KmerCounter:
         t = time.perf_counter()
         unique_kmers, counts = np.unique(kmers, return_counts=True)
         logging.info("DOne finding unique kmers")
+
+        if modulo == 0:
+            modulo = choose_modulo(len(unique_kmers))
+            logging.info("Choosing suitable modulo for hashtable to be %d" % modulo)
+
         counter = HashTable(unique_kmers, counts, mod=modulo)
         return cls(counter)
 

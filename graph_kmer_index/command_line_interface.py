@@ -57,13 +57,13 @@ def create_index_single_thread(args, interval=None):
         graph = None
         assert args.reference_fasta is not None
         assert args.reference_name is not None, "Reference name must be specified"
-        logging.info("Reference name is *%s*" % args.reference_name)
         try:
             fasta = Fasta(args.reference_fasta)
-            logging.info("Names in fasta: %s" % str(fasta.keys()))
             reference = fasta[args.reference_name]
             assert len(reference) > 0, "Length of ref sequennce is 0. Seomthing is wrong"
         except KeyError:
+            logging.info("Reference name is *%s*" % args.reference_name)
+            logging.info("Names in fasta: %s" % str(fasta.keys()))
             logging.error("Did not find reference name %s in %s" % (args.reference_name, args.reference_fasta))
             raise
 
@@ -296,7 +296,8 @@ def run_argument_parser(args):
     subparser.add_argument("-O", "--only-store-kmers", required=False, default=False, type=bool, help="Can be used when making from fasta file, will then not store the index since an index is not needed")
     subparser.set_defaults(func=make_reference_kmer_index)
 
-    def make_unique_variant_kmers_single_thread(variants, args):
+    def make_unique_variant_kmers_single_thread(data):
+        variants, args = data
         args = object_from_shared_memory(args)
         #variant_to_nodes = from_shared_memory(VariantToNodes, "variant_to_nodes_shared"+r)
         variant_to_nodes = args["variant_to_nodes"]
@@ -337,18 +338,23 @@ def run_argument_parser(args):
         return flat_kmers
 
     def make_unique_variant_kmers(args):
+        from shared_memory_wrapper.util import chunked_imap
         args = vars(args)
         args_orig = args
         args.pop("func")  # necessary for putting args in shared memory
 
+        n_threads = args["n_threads"]
+
         logging.info("Reading all variants")
+        pool = get_shared_pool(n_threads) #Pool(args["n_threads"])
         variants = VcfVariants.from_vcf(args["vcf"], skip_index=True, make_generator=True, dont_encode_chromosomes=True)
         variants = variants.get_chunks(chunk_size=args["chunk_size"])
-        pool = Pool(args["n_threads"])
 
         all_flat_kmers = []
         args = object_to_shared_memory(args)
-        for flat_kmers in pool.starmap(make_unique_variant_kmers_single_thread, zip(variants, repeat(args))):
+        logging.info("Starting parallel")
+        #for flat_kmers in pool.imap(make_unique_variant_kmers_single_thread, zip(variants, repeat(args))):
+        for flat_kmers in chunked_imap(pool, make_unique_variant_kmers_single_thread, zip(variants, repeat(args)), chunk_size=n_threads*4):
             all_flat_kmers.append(flat_kmers)
 
         logging.info("Merge all flat kmers")
@@ -594,7 +600,7 @@ def run_argument_parser(args):
     subparser = subparsers.add_parser("count_kmers")
     subparser.add_argument("-f", "--flat-kmers", required=True, type=FlatKmers.from_file)
     subparser.add_argument("-o", "--out-file-name", required=True)
-    subparser.add_argument("-m", "--modulo", required=False, type=int, default=200000033)
+    subparser.add_argument("-m", "--modulo", required=False, type=int, default=0)
     subparser.add_argument("-s", "--subsample-ratio", required=False, type=int, default=1, help="1 to keep every kmer, 2 for every other etc")
     subparser.set_defaults(func=count_kmers)
 
