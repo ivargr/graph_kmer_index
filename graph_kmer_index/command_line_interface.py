@@ -298,7 +298,9 @@ def run_argument_parser(args):
 
     def make_unique_variant_kmers_single_thread(data):
         variants, args = data
-        args = object_from_shared_memory(args)
+        if isinstance(args, str):
+            logging.info("reading args from shared memory")
+            args = object_from_shared_memory(args)
         #variant_to_nodes = from_shared_memory(VariantToNodes, "variant_to_nodes_shared"+r)
         variant_to_nodes = args["variant_to_nodes"]
 
@@ -346,16 +348,21 @@ def run_argument_parser(args):
         n_threads = args["n_threads"]
 
         logging.info("Reading all variants")
-        pool = get_shared_pool(n_threads) #Pool(args["n_threads"])
         variants = VcfVariants.from_vcf(args["vcf"], skip_index=True, make_generator=True, dont_encode_chromosomes=True)
         variants = variants.get_chunks(chunk_size=args["chunk_size"])
 
         all_flat_kmers = []
-        args = object_to_shared_memory(args)
-        logging.info("Starting parallel")
-        #for flat_kmers in pool.imap(make_unique_variant_kmers_single_thread, zip(variants, repeat(args))):
-        for flat_kmers in chunked_imap(pool, make_unique_variant_kmers_single_thread, zip(variants, repeat(args)), chunk_size=n_threads*4):
-            all_flat_kmers.append(flat_kmers)
+        if n_threads == 1:
+            logging.info("Not running in paralell")
+            for chunk in variants:
+                all_flat_kmers.append(make_unique_variant_kmers_single_thread((chunk, args)))
+        else:
+            pool = get_shared_pool(n_threads) #Pool(args["n_threads"])
+            args = object_to_shared_memory(args)
+            logging.info("Starting parallel")
+            #for flat_kmers in pool.imap(make_unique_variant_kmers_single_thread, zip(variants, repeat(args))):
+            for flat_kmers in chunked_imap(pool, make_unique_variant_kmers_single_thread, zip(variants, repeat(args)), chunk_size=n_threads*4):
+                all_flat_kmers.append(flat_kmers)
 
         logging.info("Merge all flat kmers")
         merged_flat = FlatKmers.from_multiple_flat_kmers(all_flat_kmers)
@@ -373,7 +380,7 @@ def run_argument_parser(args):
     subparser.add_argument("-p", "--position-id-index", required=False, type=from_file)
     subparser.add_argument("-D", "--use-dense-kmer-finder", required=False, type=bool, default=False)
     subparser.add_argument("-o", "--out-file-name", required=True)
-    subparser.add_argument("-v", "--vcf", required=True)
+    subparser.add_argument("-v", "--vcf", required=False)
     subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
     subparser.add_argument("-c", "--chunk-size", required=False, default=10000, type=int, help="Number of variants given to each thread")
     subparser.add_argument("-m", "--max-variant-nodes", required=False, default=6, type=int, help="Maximum number of variant nodes allowed in kmer")
@@ -381,6 +388,50 @@ def run_argument_parser(args):
     subparser.add_argument("-S", "--simple", type=bool, default=False, help="Set to True to use simple kmer selection")
     subparser.set_defaults(func=make_unique_variant_kmers)
 
+    def make_unique_variant_kmers_using_biocy(args):
+        from biocy.wrappers import get_variant_signatures
+        all_flat_kmers = []
+        ref_kmers, var_kmers = get_variant_signatures(args.graph, args.variant_to_nodes, args.kmer_counter.counter)
+
+        # get nodes for each kmer
+        ref_nodes = np.ones_like(ref_kmers) * args.variant_to_nodes.ref_nodes[:,None]  # multiple each row with ref nodes to get a ref node array that matches kmers
+        var_nodes = np.ones_like(var_kmers) * args.variant_to_nodes.var_nodes[:,None]  # multiple each row with ref nodes to get a ref node array that matches kmers
+
+        flat_ref_kmers = FlatKmers(ref_kmers.ravel(), ref_nodes.ravel())
+        flat_var_kmers = FlatKmers(var_kmers.ravel(), var_nodes.ravel())
+
+        flat = FlatKmers.from_multiple_flat_kmers([flat_ref_kmers, flat_var_kmers])
+        flat.to_file(args.out_file_name)
+        logging.info("Wrote to file %s" % args.out_file_name)
+
+
+
+    subparser = subparsers.add_parser("make_unique_variant_kmers_biocy",
+                                      help="Make a reverse variant index lookup to unique kmers on that variant")
+
+    subparser.add_argument("-g", "--graph", required=True, type=Graph.from_file)
+    subparser.add_argument("-V", "--variant_to_nodes", required=True, type=VariantToNodes.from_file)
+    subparser.add_argument("-N", "--node-to-variants", required=False)
+    subparser.add_argument("-H", "--haplotype-matrix", required=False)
+    subparser.add_argument("-k", "--kmer-size", required=True, type=int)
+    subparser.add_argument("-i", "--kmer-index", required=False,
+                           help="Kmer index used to check frequency of kmers in genome",
+                           type=CollisionFreeKmerIndex.from_file)
+    subparser.add_argument("-I", "--kmer-counter", required=False,
+                           help="Kmer index used to check frequency of kmers in genome", type=from_file)
+    subparser.add_argument("-p", "--position-id-index", required=False, type=from_file)
+    subparser.add_argument("-D", "--use-dense-kmer-finder", required=False, type=bool, default=False)
+    subparser.add_argument("-o", "--out-file-name", required=True)
+    subparser.add_argument("-v", "--vcf", required=False)
+    subparser.add_argument("-t", "--n-threads", required=False, default=1, type=int)
+    subparser.add_argument("-c", "--chunk-size", required=False, default=10000, type=int,
+                           help="Number of variants given to each thread")
+    subparser.add_argument("-m", "--max-variant-nodes", required=False, default=6, type=int,
+                           help="Maximum number of variant nodes allowed in kmer")
+    subparser.add_argument("-d", "--do-not-choose-lowest-frequency-kmers", required=False, type=bool,
+                           help="For testing only. Will not choose the best kmers.")
+    subparser.add_argument("-S", "--simple", type=bool, default=False, help="Set to True to use simple kmer selection")
+    subparser.set_defaults(func=make_unique_variant_kmers_using_biocy)
 
     def sample_kmers_from_structural_variants_command(args):
         from .structural_variants import sample_kmers_from_structural_variants
