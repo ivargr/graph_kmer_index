@@ -388,10 +388,31 @@ def run_argument_parser(args):
     subparser.add_argument("-S", "--simple", type=bool, default=False, help="Set to True to use simple kmer selection")
     subparser.set_defaults(func=make_unique_variant_kmers)
 
-    def make_unique_variant_kmers_using_biocy(args):
-        from biocy.wrappers import get_variant_signatures
+    def make_unique_variant_kmers_using_kivs(args):
+        import kivs
         all_flat_kmers = []
-        ref_kmers, var_kmers = get_variant_signatures(args.graph, args.variant_to_nodes, args.kmer_counter.counter)
+
+        ref_nodes = args.variant_to_nodes.ref_nodes
+        var_nodes = args.variant_to_nodes.var_nodes
+
+        graph = kivs.Graph.from_obgraph(args.graph)
+        kmer_finder = kivs.KmerFinder(graph, 31, reverse_kmers=True)
+
+        if (args.kmer_counter):
+            print("Got a Counter")
+            counter = args.kmer_counter.counter
+            counter = Counter(counter._keys.ravel().copy(), counter._values.ravel().copy())
+            kmer_finder.set_frequency_index(counter)
+
+        max_var = args.max_variant_nodes
+        min_overlaps = args.minimize_overlaps
+        align = args.align_windows
+
+        print("Max variant nodes:", max_var)
+
+        ref_kmers, var_kmers = kmer_finder.find_variant_signatures(
+                ref_nodes, var_nodes, max_variant_nodes=max_var,
+                minimize_overlaps=min_overlaps, align_windows=align)
 
         # get nodes for each kmer
         ref_nodes = np.ones_like(ref_kmers) * args.variant_to_nodes.ref_nodes[:,None]  # multiple each row with ref nodes to get a ref node array that matches kmers
@@ -406,7 +427,7 @@ def run_argument_parser(args):
 
 
 
-    subparser = subparsers.add_parser("make_unique_variant_kmers_biocy",
+    subparser = subparsers.add_parser("make_unique_variant_kmers_kivs",
                                       help="Make a reverse variant index lookup to unique kmers on that variant")
 
     subparser.add_argument("-g", "--graph", required=True, type=Graph.from_file)
@@ -428,10 +449,14 @@ def run_argument_parser(args):
                            help="Number of variants given to each thread")
     subparser.add_argument("-m", "--max-variant-nodes", required=False, default=6, type=int,
                            help="Maximum number of variant nodes allowed in kmer")
+    subparser.add_argument("-O", "--minimize-overlaps", action="store_true",
+                           help="Try to choose variant signatures not in reference and vice versa.")
+    subparser.add_argument("-A", "--align-windows", action="store_true",
+                           help="Require variant signature and reference signature to span the same window.")
     subparser.add_argument("-d", "--do-not-choose-lowest-frequency-kmers", required=False, type=bool,
                            help="For testing only. Will not choose the best kmers.")
     subparser.add_argument("-S", "--simple", type=bool, default=False, help="Set to True to use simple kmer selection")
-    subparser.set_defaults(func=make_unique_variant_kmers_using_biocy)
+    subparser.set_defaults(func=make_unique_variant_kmers_using_kivs)
 
     def sample_kmers_from_structural_variants_command(args):
         from .structural_variants import sample_kmers_from_structural_variants
