@@ -9,12 +9,14 @@ class CriticalGraphPaths:
         self._index = index
 
     def _make_index(self):
+        logging.info("Making index")
         if len(self.nodes) == 0:
             self._index = np.zeros(0)
             return
 
         self._index = np.zeros(np.max(self.nodes)+1, dtype=np.uint16)
         self._index[self.nodes] = self.offsets
+        logging.info("Done making index")
 
     @classmethod
     def empty(cls):
@@ -48,7 +50,7 @@ class CriticalGraphPaths:
 
 
         logging.info("Iterating chromosome start nodes %s" % graph.chromosome_start_nodes)
-        for start_node in graph.chromosome_start_nodes:
+        for start_node in graph.chromosome_start_nodes.values():
 
             #logging.info("On chromosome start node %d" % start_node)
             current_node = start_node

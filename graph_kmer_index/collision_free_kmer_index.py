@@ -207,6 +207,10 @@ class CollisionFreeKmerIndex:
                                       self._allele_frequencies.copy()
                                       )
 
+    def map_kmers(self, kmers, n_nodes):
+        from kmer_mapper.mapper import map_kmers_to_graph_index
+        return map_kmers_to_graph_index(self, n_nodes, kmers)
+
     def set_allele_frequencies(self, frequencies):
         pass
 
