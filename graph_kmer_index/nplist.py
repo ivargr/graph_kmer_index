@@ -29,7 +29,7 @@ class NpList:
 
         # extend data array if necessary
         if self._n_elements == len(self._data):
-           self._extend_data(len(self._data)*2)
+           self._extend_data(int(len(self._data)*1.5))
 
         self._data[self._n_elements] = element
         self._n_elements += 1

@@ -27,15 +27,18 @@ class KmerCounter:
         logging.info("Kmers beforesubsampling: %d" % len(kmers))
         kmers = kmers[::subsample_ratio]
         logging.info("Kmers after subsampling: %d" % len(kmers))
+
+        return cls.from_kmers(kmers, modulo)
+
+    @classmethod
+    def from_kmers(cls, kmers, modulo):
         logging.info("Finding unique kmers")
         t = time.perf_counter()
         unique_kmers, counts = np.unique(kmers, return_counts=True)
         logging.info("DOne finding unique kmers")
-
         if modulo == 0:
             modulo = choose_modulo(len(unique_kmers))
             logging.info("Choosing suitable modulo for hashtable to be %d" % modulo)
-
         counter = HashTable(unique_kmers, counts, mod=modulo)
         return cls(counter)
 
@@ -70,3 +73,11 @@ class KmerCounter:
         #assert isinstance(kmer, int), "Kmer is %s" % type(kmer)
         return self.counter[int(kmer)]
 
+    def score_kmers(self, kmers):
+        # to be used as a scorer for a set of kmers
+        hits = [self.counter[int(k)] for k in kmers]
+        hits = [h[0] for h in hits if len(h) > 0]
+        # low score is bad
+        if len(hits) == 0:
+            return 1
+        return -np.max(hits)
