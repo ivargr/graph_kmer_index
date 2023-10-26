@@ -13,6 +13,14 @@ def kmer_hash_to_reverse_complement_hash(hash, k):
     return kmer_hashes_to_reverse_complement_hash(np.array([hash]), k)[0]
 
 
+def kmer_hashes_to_reverse_complement_hash_chunked(hashes, k, chunk_size=1000000):
+    # uses less memory by chunking
+    out = []
+    for i in range(0, len(hashes), chunk_size):
+        chunk_hashes = hashes[i:i+chunk_size]
+        out.append(kmer_hashes_to_reverse_complement_hash(chunk_hashes, k))
+    return np.concatenate(out)
+
 def kmer_hashes_to_reverse_complement_hash(hashes, k):
     assert k <= 31
     complement_bases = kmer_hashes_to_complement_bases(hashes, k)

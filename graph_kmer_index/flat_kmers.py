@@ -63,8 +63,9 @@ class FlatKmers:
         return cls(data["hashes"], data["nodes"], data["ref_offsets"], data["allele_frequencies"])
 
     def to_file(self, file_name):
+        logging.info("Saving to file")
         np.savez(file_name, hashes=self._hashes, nodes=self._nodes, ref_offsets=self._ref_offsets, allele_frequencies=self._allele_frequencies)
-        logging.info("Save dto %s.npz" % file_name)
+        logging.info("Save to %s.npz" % file_name)
 
 
     @classmethod

@@ -202,7 +202,7 @@ class CollisionFreeKmerIndex:
                                       self._nodes.copy(),
                                       self._ref_offsets.copy(),
                                       self._kmers.copy(),
-                                      self._modulo.copy(),
+                                      self._modulo,
                                       self._frequencies.copy(),
                                       self._allele_frequencies.copy()
                                       )
@@ -214,6 +214,22 @@ class CollisionFreeKmerIndex:
     def has_kmers(self, kmers):
         from kmer_mapper.mapper import in_graph_index
         return in_graph_index(self, kmers).astype(bool)
+
+    def get_kmers(self):
+        """ Returns kmers that are in the index"""
+        return self._kmers
+
+    def has_kmers_parallel(self, kmers, n_threads):
+        from kmer_mapper.mapper import in_graph_index
+        from shared_memory_wrapper.shared_memory import run_numpy_based_function_in_parallel
+        from shared_memory_wrapper import object_to_shared_memory, object_from_shared_memory
+        index = object_to_shared_memory(self.copy())
+        #kmers = object_to_shared_memory(kmers)
+        def func(index, kmers):
+            index = object_from_shared_memory(index)
+            #kmers = object_from_shared_memory(kmers)
+            return in_graph_index(index, kmers).astype(bool)
+        return run_numpy_based_function_in_parallel(func, n_threads, [index, kmers])
 
     def set_allele_frequencies(self, frequencies):
         pass
@@ -405,6 +421,7 @@ class CollisionFreeKmerIndex:
 
     @classmethod
     def from_flat_kmers(cls, flat_kmers, modulo=452930477, skip_frequencies=False, skip_singletons=False):
+        logging.info("Making from flat kmers")
         if skip_singletons:
             flat_kmers = flat_kmers.get_new_without_singletons()
 
